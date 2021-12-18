@@ -297,71 +297,71 @@ ENDM PrintMessage
 
 .data 
 
-User1            db 'USER1$'
-
-User1Name        DB 15,?,15 DUP('$') , '$'
-IntialPoints1    dw ?
-
-User2            db 'USER2$'
-User2Name        DB 15,?,15 DUP('$') , '$'
-IntialPoints2    dw ?     
-
-
-
-EnterName        db 'Please enter your name:',10, 13, '$'
-
-InitialPointsMSG db 10,13,'Initial points:',10,13, '$'
-PressEnter       db 10,13,'Press ENTER to continue$'
-
+User1                   db 'USER1$'
+    
+User1Name               DB 15,?,15 DUP('$') , '$'
+IntialPoints1           dw ?
+    
+User2                   db 'USER2$'
+User2Name               DB 15,?,15 DUP('$') , '$'
+IntialPoints2           dw ?     
+    
+    
+    
+EnterName               db 'Please enter your name:',10, 13, '$'
+    
+InitialPointsMSG        db 10,13,'Initial points:',10,13, '$'
+PressEnter              db 10,13,'Press ENTER to continue$'
+    
 ;-----------MainScreenVariables-----------
-StartChat        db 'To start chatting press F1         $'
-StartGame        db 'To start game press F2             $'
-EndProg          db 'To end the program press ESC       $'
-f1Pressed        db 'Chat request has been sent         $'
-f2Pressed        db 'A game will start now!             $'
-escPressed       db 'The game will terminate            $'
-undefinedMsg     db 'Please enter a valid key(F1/F2/ESC)$'
-char             db '-'
-IsF1pressed      db 0
-IsF2pressed      db 0
-IsESCpressed     db 0
-startrow         db 2
-startcol         db 0
-endcol           db 20
+StartChat               db 'To start chatting press F1         $'
+StartGame               db 'To start game press F2             $'
+EndProg                 db 'To end the program press ESC       $'
+f1Pressed               db 'Chat request has been sent         $'
+f2Pressed               db 'A game will start now!             $'
+escPressed              db 'The game will terminate            $'
+undefinedMsg            db 'Please enter a valid key(F1/F2/ESC)$'
+char                    db '-'
+IsF1pressed             db 0
+IsF2pressed             db 0
+IsESCpressed            db 0
+startrow                db 2
+startcol                db 0
+endcol                  db 20
 
 ;Geting username variables 
-MulNmber         db 10
+MulNmber                db 10
 messageinvalidcharacter DB 'Invalid Input',10,13, '$'
 
 
 ;Chat Variables
-ChatHeight      equ 11
-ChatLength      equ 80
-ChatStatusMSG1  db 'To end chat press F3 $'
-User1CursorX    db ?
-User1CursorY    db ?
-User2CursorX    db ?
-User2CursorY    db ?
-ChatMessage     db 70,?,70 dup('$')
-ChatMessage2    db ?,'$'
+ChatHeight              equ 11
+ChatLength              equ 80
+ChatStatusMSG1          db 'To end chat press F3 $'
+User1CursorX            db ?
+User1CursorY            db ?
+User2CursorX            db ?
+User2CursorY            db ?
+ChatMessage             db 70,?,70 dup('$')
+ChatMessage2            db ?,'$'
 
 
 
 ;Global window variables
-WindowStart     equ 0
-WindowEndX      equ 80
-WindowEndY      equ 24
-
-MousePosX       dw ?
-MousePosY       dw ?
-MouseStat       dw ?
-ScanCode        db ?
-
-F3Scancode      equ 61d
-F2Scancode      equ 60d
-F1Scancode      equ 59d
-ESCScancode     equ 1d
-
+WindowStart             equ 0
+WindowEndX              equ 80
+WindowEndY              equ 24
+        
+MousePosX               dw ?
+MousePosY               dw ?
+MouseStat               dw ?
+ScanCode                db ?
+        
+F3Scancode              equ 61d
+F2Scancode              equ 60d
+F1Scancode              equ 59d
+ESCScancode             equ 1d
+        
 ;----------------------------------------------
 .code
 main proc far
@@ -520,6 +520,7 @@ GetEnter Proc
     jnz return
 
     ClearScreen 0,0,80,25,0Fh
+    SetCursor WindowStart,WindowStart,0
     RET
 GetEnter ENDP
 
