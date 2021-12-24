@@ -59,7 +59,7 @@ endm PrintChar
 ;-------Print Character in graphics mode-------
 PrintCharGraphics  MACRO char,color,times
 
-    mov al.char
+    mov al,char
     mov ah,09h
     mov bh,0
     mov bl,color
@@ -334,13 +334,24 @@ endm DrawFilledRectangle
 ;--------Draw registers----------
 DrawRegisters  MACRO x1,y1
 
-    DrawFilledRectangle x1,y1,x1+9,y1+36,White,Purple
-    DrawFilledRectangle x1+13,y1,x1+22,y1+36,White,Purple
-    DrawFilledRectangle x1+26,y1,x1+35,y1+36,White,Purple
-    DrawFilledRectangle x1+39,y1,x1+48,y1+36,White,Purple
+    DrawFilledRectangle x1,y1,x1+10,y1+43,White,Purple
+    DrawFilledRectangle x1+16,y1,x1+26,y1+43,White,Purple
+    DrawFilledRectangle x1+32,y1,x1+42,y1+43,White,Purple
+    DrawFilledRectangle x1+48,y1,x1+58,y1+43,White,Purple
 
 ENDM DrawRegisters
 
+;--------Draw circle----------
+Drawcirc Macro x,y,r,color
+
+    mov Xc, x
+    mov Yc, y
+    mov Radius,r
+    mov CircColor, color
+    call DrawCircle
+    
+
+ENDM Drawcirc
 ;--------Main menu----------
 MainMenu  MACRO 
     
@@ -402,6 +413,27 @@ X_Circle                dw 0
 Y_Circle                dw 0
 Radius                  dw 8
 P                       dw 0
+CircColor               db 0fh 
+
+;-----------Circle Text Coordinates-----------
+CircX                   db 20
+Circ1Y                  db 13
+Circ2Y                  db 16
+Circ3Y                  db 18
+Circ4Y                  db 21
+
+;-----------Game Mode Text Variables-----------
+Levelmsg                db 'LV', '$'
+AX_Reg                  db 'AX', '$'
+BX_Reg                  db 'BX', '$'
+CX_Reg                  db 'CX', '$'
+DX_Reg                  db 'DX', '$'
+SI_Reg                  db 'SI', '$'
+DI_Reg                  db 'DI', '$'
+SP_Reg                  db 'SP', '$'
+BP_Reg                  db 'BP', '$'
+
+Level                   db ?
 
 ;Geting username variables 
 MulNmber                db 10
@@ -471,13 +503,14 @@ main proc far
     ;DrawLineGraphics 100,200,50,1,0Fh
     ;DrawFilledRectangle 50,50,120,150,06,0Fh
 
-    call DrawCircle
-    dec Radius
-    call DrawCircle
+    ;call DrawCircle
+    ;dec Radius
+    ;call DrawCircle
 
 
-    ;call GameScreen
-    
+    call GameScreen
+    mov ah,0
+    int 16h  
 
     mov ah,4ch ;hlt
     int 21h
@@ -625,23 +658,64 @@ GetEnter ENDP
 ;-------Game Screen-------
 GameScreen proc
 
-    DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+16,0,Purple
+    DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+9,0,Purple
     DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+78,0,Purple
-    DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+89,0,Purple
-    DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+180,0,Purple
+    DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+92,0,Purple
+    DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+183,0,Purple
 
-    DrawLineGraphics WindowGStart+17, WindowGStart+89 ,WindowGStart+160 ,1, Purple
-    DrawLineGraphics WindowGStart,WindowGStart+16,WindowGStart+147,1,Purple
-    DrawLineGraphics WindowGStart,WindowGStart+16,WindowGStart+173,1,Purple
-    DrawLineGraphics WindowGStart+90,WindowGStart+180,WindowGStart+150,1,Purple
-    DrawLineGraphics WindowGStart+90,WindowGStart+180,WindowGStart+170,1,Purple
+    DrawLineGraphics WindowGStart+10, WindowGStart+92 ,WindowGStart+161 ,1, Purple
+    DrawLineGraphics WindowGStart,WindowGStart+9,WindowGStart+148,1,Purple ; level line 1
+    DrawLineGraphics WindowGStart,WindowGStart+9,WindowGStart+177,1,Purple ; level line 2
+    DrawLineGraphics WindowGStart+93,WindowGStart+183,WindowGStart+148,1,Purple
+    DrawLineGraphics WindowGStart+93,WindowGStart+183,WindowGStart+175,1,Purple
 
-    DrawRegisters 24,40 ;MACROO
-    DrawRegisters 24,85
+    DrawRegisters 15,40 ;MACROO
+    DrawRegisters 15,85
 
-    DrawRegisters 24,200 ;MACROO
-    DrawRegisters 24,245
+    DrawRegisters 15,200 ;MACROO
+    DrawRegisters 15,245
 
+    DrawCirc 162,106,9,LightGreen
+    DrawCirc 162,128,9,LightRed
+    DrawCirc 162,149,9,LightCyan
+    DrawCirc 162,172,9,Yellow
+
+    SetCursor 19,0,0
+    PrintMessage Levelmsg
+    ;PrintMessage Level
+    SetCursor 2,2,0
+    PrintMessage AX_Reg
+    SetCursor 2,4,0
+    PrintMessage BX_Reg
+    SetCursor 2,6,0
+    PrintMessage CX_Reg
+    SetCursor 2,8,0
+    PrintMessage DX_Reg
+    SetCursor 17,2,0
+    PrintMessage SI_Reg
+    SetCursor 17,4,0
+    PrintMessage DI_Reg
+    SetCursor 17,6,0
+    PrintMessage SP_Reg
+    SetCursor 17,8,0
+    PrintMessage BP_Reg
+
+    SetCursor 22,2,0
+    PrintMessage AX_Reg
+    SetCursor 22,4,0
+    PrintMessage BX_Reg
+    SetCursor 22,6,0
+    PrintMessage CX_Reg
+    SetCursor 22,8,0
+    PrintMessage DX_Reg
+    SetCursor 37,2,0
+    PrintMessage SI_Reg
+    SetCursor 37,4,0
+    PrintMessage DI_Reg
+    SetCursor 37,6,0
+    PrintMessage SP_Reg
+    SetCursor 37,8,0
+    PrintMessage BP_Reg
     ret
 GameScreen endp
 
@@ -712,7 +786,7 @@ endp DrawCircle
 ;-------Plotting circle-------
 plot proc
     mov ah,0ch
-    mov al,02
+    mov al,CircColor
 
     mov cx,XC
     add cx,X_Circle
