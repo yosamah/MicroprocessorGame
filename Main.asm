@@ -651,6 +651,9 @@ rcrCommand              db 'rcr$'
 UserCommand1            db 14,?,14 dup('$')
 UserCommand2            db 14,?,14 dup('$')
 
+UserCommandSpaces       db 14 dup(' '),'$'
+
+
 UserCommand1Col         db 0
 UserCommand1row         db 10
 
@@ -877,6 +880,10 @@ WriteCommand proc
     SetCursor UserCommand1Col,UserCommand1row,0
     ReadMessage UserCommand1
     UpperToLower UserCommand1
+
+    ;SetCursor UserCommand1Col,UserCommand1row,0     2 commands
+    ;PrintMessage UserCommandSpaces
+    
 
     SetCursor UserCommand2Col,UserCommand2row,0
     ReadMessage UserCommand2
