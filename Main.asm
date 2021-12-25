@@ -660,6 +660,7 @@ UserCommand1row         db 10
 UserCommand2Col         db 21
 UserCommand2row         db 10
 
+CurCommand              db 6,?,6 dup('$')
 
 
 ;Colors
@@ -687,6 +688,7 @@ White                   equ 0Fh
 main proc far
     mov ax,@DATA
     mov ds,ax
+    mov es,ax
 
     MainMenu
 
@@ -880,7 +882,11 @@ WriteCommand proc
     SetCursor UserCommand1Col,UserCommand1row,0
     ReadMessage UserCommand1
     UpperToLower UserCommand1
+    call PickCommand
+    ;check if command is valid -> change in the registers
 
+    ;if not valid -1 in points and take the other user command
+    
     ;SetCursor UserCommand1Col,UserCommand1row,0     2 commands
     ;PrintMessage UserCommandSpaces
     
@@ -894,6 +900,24 @@ endp WriteCommand
 
 
 ;-------Pick Command-------
+PickCommand proc
+    pusha
+    lea si, UserCommand1+2
+    lea di, incCommand
+    mov cx, 3
+    REPE CMPSB
+    cmp cx,0
+    jne next
+    
+    INCAcc:
+    SetCursor 0,19,0
+    PrintMessage incCommand
+
+    next:
+    popa
+    
+    ret
+ENDP PickCommand
 
 ;-------Game Screen-------
 GameScreen proc
