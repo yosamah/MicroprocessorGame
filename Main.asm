@@ -1,4 +1,4 @@
-;-----------بِسْمِ اللَّـهِ الرَّحْمَـٰنِ الرَّحِيمِ------------
+;-----------بِسْمِ اللَّـهِ الرَّحْمَـٰنِ الرَّحِيمِ------------;
 
 ;-----------------MACROS-----------------
 
@@ -455,7 +455,82 @@ GetMin Macro x,y,Min
 
 ENDM GetMin
 
+;-------Load Registers-------
+LoadReg Macro AX_Reg_Value,BX_Reg_Value,CX_Reg_Value,DX_Reg_Value,SI_Reg_Value,DI_Reg_Value,SP_Reg_Value,BP_Reg_Value,CF ;CF-> carry flag
+    Local ClearCarry,Exit
 
+    mov ax, AX_Reg_Value
+    mov bx, BX_Reg_Value
+    mov cx, CX_Reg_Value
+    mov dx, DX_Reg_Value
+    mov si, SI_Reg_Value
+    mov di, DI_Reg_Value
+    mov sp, SP_Reg_Value
+    mov bp, BP_Reg_Value
+    cmp CF,0
+    je ClearCarry
+    stc
+    jmp Exit
+    ClearCarry:
+    clc
+    Exit:
+ENDM LoadReg
+;-------exc Command-------
+excIncCommand Macro UserNum
+    Local U1,skip, findLetter,axsah,bayz,tanyuser
+    mov dl, 3
+    cmp CurCommand+3,' '
+    jne bayz
+    findLetter:
+        inc dl 
+        cmp dl, actualSizeCommand
+        ja bayz
+        mov di, dl
+        cmp CurCommand+di,' '
+    je findLetter
+
+    mov si, CurCommand+di
+    mov di, AX_RegSmall
+    mov cx, 2
+    REPE CMPSB
+    cmp cx, 0  
+    je axsah
+
+
+    
+
+    axsah:
+    mov CurReg,0
+    
+    cmp UserNum,1
+    je U1
+    LoadReg AX_Reg_Value1,BX_Reg_Value1,CX_Reg_Value1,DX_Reg_Value1,SI_Reg_Value1,DI_Reg_Value1,SP_Reg_Value1,BP_Reg_Value1,CF1
+
+
+    jmp skip
+    U1:
+    
+    LoadReg AX_Reg_Value2,BX_Reg_Value2,CX_Reg_Value2,DX_Reg_Value2,SI_Reg_Value2,DI_Reg_Value2,SP_Reg_Value2,BP_Reg_Value2,CF2
+
+    skip:
+    
+    cmp CurReg,0
+    jne bayz
+    inc ax
+    cmp UserNum,1
+    jne tanyuser
+    mov AX_Reg_Value1,ax
+    jmp bayz
+
+    tanyuser:
+    mov AX_Reg_Value2,ax
+
+
+
+    bayz:
+
+
+ENDM excIncCommand
 ;--------Set Brush----------
 
 SetBrush Macro realSize, Color
@@ -562,25 +637,38 @@ DI_Reg                  db 'DI', '$'
 SP_Reg                  db 'SP', '$'
 BP_Reg                  db 'BP', '$'
 
+
+AX_RegSmall             db 'ax', '$'
+BX_RegSmall             db 'bx', '$'
+CX_RegSmall             db 'cx', '$'
+DX_RegSmall             db 'dx', '$'
+SI_RegSmall             db 'si', '$'
+DI_RegSmall             db 'di', '$'
+SP_RegSmall             db 'sp', '$'
+BP_RegSmall             db 'bp', '$'
+
 Level                   db ?
 
-AX_Reg_Value1                 db '0000', '$'
-BX_Reg_Value1                 db '0000', '$'
-CX_Reg_Value1                 db '0000', '$'
-DX_Reg_Value1                 db '0000', '$'
-SI_Reg_Value1                 db '0000', '$'
-DI_Reg_Value1                 db '0000', '$'
-SP_Reg_Value1                 db '0000', '$'
-BP_Reg_Value1                 db '0000', '$'
+AX_Reg_Value1           db '0000', '$'
+BX_Reg_Value1           db '0000', '$'
+CX_Reg_Value1           db '0000', '$'
+DX_Reg_Value1           db '0000', '$'
+SI_Reg_Value1           db '0000', '$'
+DI_Reg_Value1           db '0000', '$'
+SP_Reg_Value1           db '0000', '$'
+BP_Reg_Value1           db '0000', '$'
 
-AX_Reg_Value2                 db '0000', '$'
-BX_Reg_Value2                 db '0000', '$'
-CX_Reg_Value2                 db '0000', '$'
-DX_Reg_Value2                 db '0000', '$'
-SI_Reg_Value2                 db '0000', '$'
-DI_Reg_Value2                 db '0000', '$'
-SP_Reg_Value2                 db '0000', '$'
-BP_Reg_Value2                 db '0000', '$'
+AX_Reg_Value2           db '0000', '$'
+BX_Reg_Value2           db '0000', '$'
+CX_Reg_Value2           db '0000', '$'
+DX_Reg_Value2           db '0000', '$'
+SI_Reg_Value2           db '0000', '$'
+DI_Reg_Value2           db '0000', '$'
+SP_Reg_Value2           db '0000', '$'
+BP_Reg_Value2           db '0000', '$'
+
+CF1                     db 0
+CF2                     db 0
 
 ;Geting username variables 
 MulNmber                db 10
@@ -648,8 +736,11 @@ popCommand              db 'pop$'
 rclCommand              db 'rcl$'
 rcrCommand              db 'rcr$'
 
+
 UserCommand1            db 14,?,14 dup('$')
 UserCommand2            db 14,?,14 dup('$')
+
+
 
 UserCommandSpaces       db 14 dup(' '),'$'
 
@@ -660,7 +751,19 @@ UserCommand1row         db 10
 UserCommand2Col         db 21
 UserCommand2row         db 10
 
-CurCommand              db 6,?,6 dup('$')
+CurCommand              db 14 dup('$')
+actualSizeCommand       db ?
+
+; ax = 0
+; bx = 1
+; cx = 2
+; dx = 3
+; si = 4
+; di = 5
+; sp = 6
+; bp = 7
+
+CurReg                  db ?  
 
 
 ;Colors
@@ -703,6 +806,11 @@ main endp
 
 
 ;---------------------Proceduers---------------------
+
+
+
+
+
 
 videotest proc near
     mov cx,62
@@ -910,9 +1018,17 @@ PickCommand proc
     jne next
     
     INCAcc:
-    SetCursor 0,19,0
-    PrintMessage incCommand
+    pusha
+    mov SI,offset UserCommand1+2
+    mov DI,offset CurCommand
+    mov cl,UserCommand1+1
+    mov ch,0
+    REP MOVSW;Copies the first 10 words from SI to DI
+    popa
 
+    excIncCommand 1
+   
+    
     next:
     popa
     
