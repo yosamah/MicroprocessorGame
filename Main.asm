@@ -157,7 +157,7 @@ ReadMessage MACRO msg
     int 21h
 endm ReadMessage
 
-;-------Scroll-------
+;-------Scroll down-------
 Scroll MACRO x1,y1,x2,y2,Color,line
 
     mov ah,06h
@@ -170,6 +170,20 @@ Scroll MACRO x1,y1,x2,y2,Color,line
     int 10h
 
 endm Scroll
+
+;-------Scroll Up-------
+ScrollScreenUp MACRO x1,y1,x2,y2,Color,line
+
+    mov ah,07h
+    mov al,line
+    mov bh,07
+    mov cl,x1
+    mov ch,y1
+    mov dl,x2
+    mov dh,y2
+    int 10h
+
+endm ScrollScreenUp
 
 ;--------Getting the username from the user----------
 GetUserName MACRO UserName
@@ -339,6 +353,8 @@ DrawRegisters  MACRO x1,y1
     DrawFilledRectangle x1+32,y1,x1+42,y1+43,White,Purple
     DrawFilledRectangle x1+48,y1,x1+58,y1+43,White,Purple
 
+     ;DrawFilledRectangle x1+70,y1,x1+65,y1+43,White,Purple
+
 ENDM DrawRegisters
 
 ;--------Draw circle----------
@@ -450,7 +466,13 @@ User2CursorX            db ?
 User2CursorY            db ?
 ChatMessage             db 70,?,70 dup('$')
 ChatMessage2            db ?,'$'
+test2                   db 25,?,25 dup('$')
 
+;TESTING
+test3                   dw 93
+test4                   dw 30
+test5                   dw 120
+test6                   dw 70
 
 ;Global window variables
 WindowStart             equ 0
@@ -501,7 +523,7 @@ main proc far
     changeGraphicsmode
     
     ;DrawLineGraphics 100,200,50,1,0Fh
-    ;DrawFilledRectangle 50,50,120,150,06,0Fh
+  
 
     ;call DrawCircle
     ;dec Radius
@@ -509,6 +531,10 @@ main proc far
 
 
     call GameScreen
+    
+    call videotest
+    
+   
     mov ah,0
     int 16h  
 
@@ -519,6 +545,43 @@ main endp
 
 
 ;---------------------Proceduers---------------------
+
+videotest proc near
+    mov cx,62
+
+   
+    lef:
+    push cx
+    DrawFilledRectangle test3,test4,test5,test6,LightGreen,LightGreen
+    DrawFilledRectangle test3,test4,test5,test6,Black,Black
+    pop cx
+    inc test3
+    ;inc test4
+    inc test5
+    dec CX
+    jnz lef
+    ;DrawFilledRectangle test3,test4,test5,test6,Purple,White
+    ;DrawFilledRectangle test3,test4,test5,test6,Black,Black
+    mov cx,62
+    mov test3,93                   
+    mov test4,30                   
+    mov test5,120                   
+    mov test6,70        
+
+     lef2:
+    push cx
+    DrawFilledRectangle test3,test4,test5,test6,LightCyan,LightCyan
+    DrawFilledRectangle test3,test4,test5,test6,Black,Black
+    pop cx
+    inc test3
+    ;inc test4
+    inc test5
+    dec CX
+    jnz lef2
+    
+
+    ret
+endp videotest
 
 ;-------MainScreen-------
 MainScreen proc near
