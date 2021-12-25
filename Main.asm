@@ -79,6 +79,7 @@ endm DrawLine
 ;-------Print a message on the screen-------
 PrintMessage MACRO MyMessage 
     mov AH,9h
+    mov bl,Purple
     lea DX,MyMessage
     int 21h
 ENDM PrintMessage
@@ -368,10 +369,108 @@ Drawcirc Macro x,y,r,color
     
 
 ENDM Drawcirc
+;--------Welcome Text----------
+WelcomeText Macro
+    SetCursor 23, 8, 0
+    PrintMessage Welcome
+    mov ah,0
+    int 16h
+    ClearScreen 0,0,80,25,0Fh
+    SetCursor WindowStart,WindowStart,0
+ENDM WelcomeText
+;--------GoodBye Text----------
+GoodByeText Macro
+    changeTextmode
+    ClearScreen 0,0,80,25,0Fh
+    SetCursor 35, 8, 0
+    PrintMessage GoodBye
+    mov ah,0
+    int 16h
+ENDM GoodByeText
+;--------Upper to lower case----------
+UpperToLower Macro InputString
+    Local loop1,loop2
+pusha
+    mov bx , 0h
+
+    loop1:
+    mov al, InputString[bx]
+    cmp al , 'A'
+    jb  loop2
+    cmp al , 'Z'
+    ja loop2
+    add al , 20h
+
+    loop2: 
+
+    mov InputString[bx] , al 
+    inc bx
+    cmp bx , 16h
+    jnz loop1
+
+popa
+endm UpperToLower
+;--------Set 4 Digits----------
+Set4Dig Macro IntialPoints,IntialPoints_Meg
+    pusha
+    mov ax,IntialPoints
+    mov bl,10
+    div bl
+
+    add ah,30h
+    mov IntialPoints_Meg[3],ah
+
+    mov ah,0
+    div bl
+
+    add ah,30h
+    mov IntialPoints_Meg[2],ah
+
+    mov ah,0
+    div bl
+
+    add ah,30h
+    mov IntialPoints_Meg[1],ah
+
+    mov ah,0
+    div bl
+
+    add ah,30h
+    mov IntialPoints_Meg[0],ah
+
+    popa
+ENDM Set4Dig
+;--------Get Minimum----------
+GetMin Macro x,y,Min
+    Local Exit
+    pusha
+    mov ax,x
+    mov min,ax
+    mov ax,y
+    cmp Min,ax
+    jb Exit
+    mov Min,ax
+    popa
+    Exit:
+
+ENDM GetMin
+
+
+;--------Set Brush----------
+
+SetBrush Macro realSize, Color
+
+    mov ah,09
+    mov bl, Color
+    mov cx, realSize
+    int 10h
+
+endm SetBrush
 ;--------Main menu----------
 MainMenu  MACRO 
     
-     changeTextmode  
+    changeTextmode  
+    WelcomeText
     ;Get Info  of user1 
     GetUserName User1Name
     ReadNumber IntialPoints1
@@ -381,7 +480,12 @@ MainMenu  MACRO
     GetUserName User2Name
     ReadNumber IntialPoints2
     call GetEnter
-
+    GetMin IntialPoints1,IntialPoints2,MinIP
+    pusha
+    mov ax, MinIP
+    mov IntialPoints1,ax
+    mov IntialPoints2,ax
+    popa
     
     Call MainScreen
 
@@ -394,12 +498,19 @@ ENDM MainMenu
 .data 
 
 User1                   db 'USER1$'
-User1Name               DB 15,?,15 DUP('$') , '$'
+User1Name               DB 12,?,12 DUP('$') , '$'
+realSize1               db ?
 IntialPoints1           dw ?
+IP1                     db '0000$'  ;IntialPoints1 as a message
+
     
 User2                   db 'USER2$'
-User2Name               DB 15,?,15 DUP('$') , '$'
-IntialPoints2           dw ?      
+User2Name               DB 12,?,12 DUP('$') , '$'
+realSize2               db ?
+IntialPoints2           dw ?
+IP2                     db '0000$' ;IntialPoints2 as a message 
+
+MinIP                   dw ?       ;Minimum of IntialPoints
     
 EnterName               db 'Please enter your name:',10, 13, '$'
     
@@ -407,6 +518,8 @@ InitialPointsMSG        db 10,13,'Initial points:',10,13, '$'
 PressEnter              db 10,13,'Press ENTER to continue$'
     
 ;-----------MainScreenVariables-----------
+Welcome                 db 'Welcome, Press any key to start', '$'
+GoodBye                 db 'GoodBye... ','$'
 StartChat               db 'To start chatting press F1         $'
 StartGame               db 'To start game press F2             $'
 EndProg                 db 'To end the program press ESC       $'
@@ -451,6 +564,24 @@ BP_Reg                  db 'BP', '$'
 
 Level                   db ?
 
+AX_Reg_Value1                 db '0000', '$'
+BX_Reg_Value1                 db '0000', '$'
+CX_Reg_Value1                 db '0000', '$'
+DX_Reg_Value1                 db '0000', '$'
+SI_Reg_Value1                 db '0000', '$'
+DI_Reg_Value1                 db '0000', '$'
+SP_Reg_Value1                 db '0000', '$'
+BP_Reg_Value1                 db '0000', '$'
+
+AX_Reg_Value2                 db '0000', '$'
+BX_Reg_Value2                 db '0000', '$'
+CX_Reg_Value2                 db '0000', '$'
+DX_Reg_Value2                 db '0000', '$'
+SI_Reg_Value2                 db '0000', '$'
+DI_Reg_Value2                 db '0000', '$'
+SP_Reg_Value2                 db '0000', '$'
+BP_Reg_Value2                 db '0000', '$'
+
 ;Geting username variables 
 MulNmber                db 10
 messageinvalidcharacter DB 'Invalid Input',10,13, '$'
@@ -493,6 +624,40 @@ F2Scancode              equ 60d
 F1Scancode              equ 59d
 ESCScancode             equ 1d
 
+Semicolon               db ':$'
+
+;Chosen Commands
+incCommand              db 'inc$'
+decCommand              db 'dec$'
+shlCommand              db 'shl$'
+shrCommand              db 'shr$'
+clcCommand              db 'clc$'
+rorCommand              db 'ror$'
+rolCommand              db 'rol$'
+nopCommand              db 'nop$'
+addCommand              db 'add$'
+subCommand              db 'sub$'
+adcCommand              db 'adc$'
+SBBCommand              db 'sbb$'
+orCommand               db 'or$'
+xorCommand              db 'xor$'
+andCommand              db 'and$'
+movCommand              db 'mov$'
+pushCommand             db 'push$'
+popCommand              db 'pop$'
+rclCommand              db 'rcl$'
+rcrCommand              db 'rcr$'
+
+UserCommand1            db 14,?,14 dup('$')
+UserCommand2            db 14,?,14 dup('$')
+
+UserCommand1Col         db 0
+UserCommand1row         db 10
+
+UserCommand2Col         db 21
+UserCommand2row         db 10
+
+
 
 ;Colors
 Black                   equ 0
@@ -513,31 +678,19 @@ Yellow                  equ 0Eh
 White                   equ 0Fh
         
 ;----------------------------------------------
+
+
 .code
 main proc far
     mov ax,@DATA
     mov ds,ax
 
-    ;MainMenu
-
-    changeGraphicsmode
-    
-    ;DrawLineGraphics 100,200,50,1,0Fh
-  
-
-    ;call DrawCircle
-    ;dec Radius
-    ;call DrawCircle
+    MainMenu
 
 
-    call GameScreen
-    
-    call videotest
-    
-   
     mov ah,0
     int 16h  
-
+    GoodByeText
     mov ah,4ch ;hlt
     int 21h
 
@@ -610,6 +763,8 @@ MainScreen proc near
         SetCursor 0, 21, 0
         PrintMessage f2Pressed
         mov IsF2pressed, 1
+        changeGraphicsmode
+        call GameScreen
         jmp finishd
         check3rdkey:
         cmp ah, 1
@@ -716,7 +871,22 @@ GetEnter Proc
     SetCursor WindowStart,WindowStart,0
     RET
 GetEnter ENDP
+;-------Writing commands-------
 
+WriteCommand proc
+    SetCursor UserCommand1Col,UserCommand1row,0
+    ReadMessage UserCommand1
+    UpperToLower UserCommand1
+
+    SetCursor UserCommand2Col,UserCommand2row,0
+    ReadMessage UserCommand2
+    UpperToLower UserCommand2
+
+    ret
+endp WriteCommand
+
+
+;-------Pick Command-------
 
 ;-------Game Screen-------
 GameScreen proc
@@ -779,6 +949,77 @@ GameScreen proc
     PrintMessage SP_Reg
     SetCursor 37,8,0
     PrintMessage BP_Reg
+
+    ;setting the values of registers to 0000
+
+    SetCursor 6,2,0
+    PrintMessage AX_Reg_Value1
+    SetCursor 6,4,0
+    PrintMessage BX_Reg_Value1
+    SetCursor 6,6,0
+    PrintMessage CX_Reg_Value1
+    SetCursor 6,8,0
+    PrintMessage DX_Reg_Value1
+    SetCursor 11,2,0
+    PrintMessage SI_Reg_Value1
+    SetCursor 11,4,0
+    PrintMessage DI_Reg_Value1
+    SetCursor 11,6,0
+    PrintMessage SP_Reg_Value1
+    SetCursor 11,8,0
+    PrintMessage BP_Reg_Value1
+
+    SetCursor 26,2,0
+    PrintMessage AX_Reg_Value2
+    SetCursor 26,4,0
+    PrintMessage BX_Reg_Value2
+    SetCursor 26,6,0
+    PrintMessage CX_Reg_Value2
+    SetCursor 26,8,0
+    PrintMessage DX_Reg_Value2
+    SetCursor 31,2,0
+    PrintMessage SI_Reg_Value2
+    SetCursor 31,4,0
+    PrintMessage DI_Reg_Value2
+    SetCursor 31,6,0
+    PrintMessage SP_Reg_Value2
+    SetCursor 31,8,0
+    PrintMessage BP_Reg_Value2
+
+    ;Name of the Users to Print it at the Top for the IntialPoints
+    
+    SetCursor 0,0,0
+    PrintMessage User1Name+2
+    SetCursor User1Name+1,0,0
+    PrintMessage Semicolon
+    Set4Dig IntialPoints1,IP1
+    PrintMessage IP1
+
+
+    SetCursor 23,0,0
+    PrintMessage User2Name+2
+    pusha
+    mov al, [User2Name+1]
+    add al,23
+    SetCursor al,0,0
+    PrintMessage Semicolon
+    popa
+    Set4Dig IntialPoints2,IP2
+    PrintMessage IP2
+
+    ;Print the Names for the chat Mode
+    SetCursor 0,23,0
+    PrintMessage User1Name+2
+    SetCursor User1Name+1,23,0
+    PrintMessage Semicolon
+    SetCursor 0,24,0
+    PrintMessage User2Name+2
+    SetCursor User2Name+1,24,0
+    PrintMessage Semicolon
+    Call WriteCommand
+    
+
+
     ret
 GameScreen endp
 
