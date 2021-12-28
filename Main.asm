@@ -1431,7 +1431,7 @@ start_shl_loop:
     mov Operand1Value,ax
     adc CheckCarry,0
     mov bl,CheckCarry
-    mov CF1,bl
+    mov CF2,bl
     mov CheckCarry,0
     popa
     call LoadOperandValueUser2
@@ -1467,7 +1467,7 @@ start_shr_loop:
     mov Operand1Value,ax
     adc CheckCarry,0
     mov bl,CheckCarry
-    mov CF1,bl
+    mov CF2,bl
     mov CheckCarry,0
     popa
     call LoadOperandValueUser2
@@ -1507,7 +1507,7 @@ start_ror_loop:
     mov Operand1Value,ax
     adc CheckCarry,0
     mov bl,CheckCarry
-    mov CF1,bl
+    mov CF2,bl
     mov CheckCarry,0
     popa
     call LoadOperandValueUser2
@@ -1543,7 +1543,7 @@ start_ror_loop:
     mov Operand1Value,ax
     adc CheckCarry,0
     mov bl,CheckCarry
-    mov CF1,bl
+    mov CF2,bl
     mov CheckCarry,0
     popa
     call LoadOperandValueUser2
@@ -1579,7 +1579,7 @@ start_ror_loop:
     mov Operand1Value,ax
     adc CheckCarry,0
     mov bl,CheckCarry
-    mov CF1,bl
+    mov CF2,bl
     mov CheckCarry,0
     popa
     call LoadOperandValueUser2
@@ -1615,7 +1615,7 @@ start_ror_loop:
     mov Operand1Value,ax
     adc CheckCarry,0
     mov bl,CheckCarry
-    mov CF1,bl
+    mov CF2,bl
     mov CheckCarry,0
     popa
     call LoadOperandValueUser2
