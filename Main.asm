@@ -1525,12 +1525,12 @@ rol_loop:
     call GetOperandValueUser2
     pusha
     cmp cf2,0
-    je zero_ror_loop
+    je zero_rol_loop
     STC
-    jmp start_ror_loop
-zero_ror_loop:
+    jmp start_rol_loop
+zero_rol_loop:
     CLC
-start_ror_loop:
+start_rol_loop:
     mov ax,Operand1Value
      ;SetCursor 26,16,0
      ;PrintMessage Operand1Value
@@ -1561,12 +1561,12 @@ rcl_loop:
     call GetOperandValueUser2
     pusha
     cmp cf2,0
-    je zero_ror_loop
+    je zero_rcl_loop
     STC
-    jmp start_ror_loop
-zero_ror_loop:
+    jmp start_rcl_loop
+zero_rcl_loop:
     CLC
-start_ror_loop:
+start_rcl_loop:
     mov ax,Operand1Value
      ;SetCursor 26,16,0
      ;PrintMessage Operand1Value
@@ -1597,12 +1597,12 @@ rcr_loop:
     call GetOperandValueUser2
     pusha
     cmp cf2,0
-    je zero_ror_loop
+    je zero_rcr_loop
     STC
-    jmp start_ror_loop
-zero_ror_loop:
+    jmp start_rcr_loop
+zero_rcr_loop:
     CLC
-start_ror_loop:
+start_rcr_loop:
     mov ax,Operand1Value
      ;SetCursor 26,16,0
      ;PrintMessage Operand1Value
@@ -2214,26 +2214,124 @@ GetOperandValueUser2 proc
     je DIidxisOP2
  
  AXisOP2:
-       
+ cmp CurrUser,2
+ je user2_ax      
        AsciiToNumber AX_Reg_Value2,0,Operand1Value
- ALisOP2:
- AHisOP2:
- BXisOP2:
- BLisOP2:
- BHisOP2:
- CXisOP2:
- CLisOP2:
- CHisOP2:
- DXisOP2:
- DLisOP2:
- DHisOP2:
- SIisOP2:
- DIisOP2:
- SPisOP2:
- BPisOP2:
- BXidxisOP2:
- SIidxisOP2:
- DIidxisOP2:
+       jmp finished_GetOperandValueUser2
+user2_ax:
+       AsciiToNumber AX_Reg_Value1,0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+ALisOP2:
+cmp CurrUser,2
+je user2_al 
+        AsciiToNumber AX_Reg_Value2[2],0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_al:
+       AsciiToNumber AX_Reg_Value1[2],0,Operand1Value
+       jmp finished_GetOperandValueUser2
+
+AHisOP2:
+
+BXisOP2:
+cmp CurrUser,2
+je user2_bx 
+       AsciiToNumber BX_Reg_Value2,0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_bx:
+       AsciiToNumber BX_Reg_Value1,0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+BLisOP2:
+cmp CurrUser,2
+je user2_bl 
+       AsciiToNumber BX_Reg_Value2[2],0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_bl:
+       AsciiToNumber BX_Reg_Value1[2],0,Operand1Value
+       jmp finished_GetOperandValueUser2
+
+BHisOP2:
+
+CXisOP2:
+cmp CurrUser,2
+je user2_cx 
+       AsciiToNumber CX_Reg_Value2,0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_cx:
+       AsciiToNumber CX_Reg_Value1,0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+CLisOP2:
+cmp CurrUser,2
+je user2_cl 
+       AsciiToNumber CX_Reg_Value2[2],0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_cl:
+       AsciiToNumber CX_Reg_Value1[2],0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+CHisOP2:
+
+DXisOP2:
+cmp CurrUser,2
+je user2_dx 
+       AsciiToNumber DX_Reg_Value2,0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_dx:
+       AsciiToNumber DX_Reg_Value1,0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+DLisOP2:
+cmp CurrUser,2
+je user2_dl
+       AsciiToNumber DX_Reg_Value2[2],0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_dl:
+       AsciiToNumber DX_Reg_Value1[2],0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+DHisOP2:
+
+SIisOP2:
+cmp CurrUser,2
+je user2_si
+       AsciiToNumber SI_Reg_Value2,0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_si:
+       AsciiToNumber SI_Reg_Value1,0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+DIisOP2:
+cmp CurrUser,2
+je user2_di
+       AsciiToNumber DI_Reg_Value2,0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_di:
+       AsciiToNumber DI_Reg_Value1,0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+SPisOP2:
+cmp CurrUser,2
+je user2_sp
+       AsciiToNumber SP_Reg_Value2,0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_sp:
+       AsciiToNumber SP_Reg_Value1,0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+BPisOP2:
+cmp CurrUser,2
+je user2_bp
+       AsciiToNumber BP_Reg_Value2,0,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_bp:
+       AsciiToNumber BP_Reg_Value1,0,Operand1Value
+       jmp finished_GetOperandValueUser2 
+
+BXidxisOP2:
+SIidxisOP2:
+DIidxisOP2:
  
 
      
