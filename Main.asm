@@ -993,7 +993,7 @@ UserCommand2row         db 10
 
 CurCommand              db 14 dup('$')
 actualSizeCommand       dw ?
-
+CurrUser                db ?
 ; ax = 0
 ; bx = 1
 ; cx = 2
@@ -1227,6 +1227,7 @@ GetEnter ENDP
 ;-------Writing commands-------
 
 WriteCommand proc
+    mov CurrUser,1
     SetCursor UserCommand1Col,UserCommand1row,0
     ReadMessage UserCommand1
     UpperToLower UserCommand1
@@ -1238,10 +1239,11 @@ WriteCommand proc
     ;SetCursor UserCommand1Col,UserCommand1row,0     2 commands
     ;PrintMessage UserCommandSpaces
     
-
+    mov CurrUser,2
     SetCursor UserCommand2Col,UserCommand2row,0
     ReadMessage UserCommand2
     UpperToLower UserCommand2
+    call excCommand
 
     ret
 endp WriteCommand
@@ -1470,22 +1472,175 @@ start_shr_loop:
     popa
     call LoadOperandValueUser2
     jmp msh_bayz
+
 clc_loop:
+    mov CF2,0
+    jmp msh_bayz
+
 ror_loop:
-rol_loop:    
+    cmp Operand2Type,4
+    jne bayz
+    cmp Operand1Type,0
+    je bayz
+    cmp Operand1Type,4
+    je bayz
+    cmp Operand1Type,5
+    je bayz
+    call GetOperandValueUser2
+    pusha
+    cmp cf2,0
+    je zero_ror_loop
+    STC
+    jmp start_ror_loop
+zero_ror_loop:
+    CLC
+start_ror_loop:
+    mov ax,Operand1Value
+     ;SetCursor 26,16,0
+     ;PrintMessage Operand1Value
+    AsciiToNumber Operand2,0,Operand2Value
+     ;SetCursor 26,18,0
+     ;PrintMessage Operand2Value
+    mov cx,Operand2Value
+    mov ch,0
+    ror ax,cl
+    mov Operand1Value,ax
+    adc CheckCarry,0
+    mov bl,CheckCarry
+    mov CF1,bl
+    mov CheckCarry,0
+    popa
+    call LoadOperandValueUser2
+    jmp msh_bayz
+
+rol_loop:
+    cmp Operand2Type,4
+    jne bayz
+    cmp Operand1Type,0
+    je bayz
+    cmp Operand1Type,4
+    je bayz
+    cmp Operand1Type,5
+    je bayz
+    call GetOperandValueUser2
+    pusha
+    cmp cf2,0
+    je zero_ror_loop
+    STC
+    jmp start_ror_loop
+zero_ror_loop:
+    CLC
+start_ror_loop:
+    mov ax,Operand1Value
+     ;SetCursor 26,16,0
+     ;PrintMessage Operand1Value
+    AsciiToNumber Operand2,0,Operand2Value
+     ;SetCursor 26,18,0
+     ;PrintMessage Operand2Value
+    mov cx,Operand2Value
+    mov ch,0
+    rol ax,cl
+    mov Operand1Value,ax
+    adc CheckCarry,0
+    mov bl,CheckCarry
+    mov CF1,bl
+    mov CheckCarry,0
+    popa
+    call LoadOperandValueUser2
+    jmp msh_bayz
+
+rcl_loop:
+    cmp Operand2Type,4
+    jne bayz
+    cmp Operand1Type,0
+    je bayz
+    cmp Operand1Type,4
+    je bayz
+    cmp Operand1Type,5
+    je bayz
+    call GetOperandValueUser2
+    pusha
+    cmp cf2,0
+    je zero_ror_loop
+    STC
+    jmp start_ror_loop
+zero_ror_loop:
+    CLC
+start_ror_loop:
+    mov ax,Operand1Value
+     ;SetCursor 26,16,0
+     ;PrintMessage Operand1Value
+    AsciiToNumber Operand2,0,Operand2Value
+     ;SetCursor 26,18,0
+     ;PrintMessage Operand2Value
+    mov cx,Operand2Value
+    mov ch,0
+    rcl ax,cl
+    mov Operand1Value,ax
+    adc CheckCarry,0
+    mov bl,CheckCarry
+    mov CF1,bl
+    mov CheckCarry,0
+    popa
+    call LoadOperandValueUser2
+    jmp msh_bayz
+
+rcr_loop:
+    cmp Operand2Type,4
+    jne bayz
+    cmp Operand1Type,0
+    je bayz
+    cmp Operand1Type,4
+    je bayz
+    cmp Operand1Type,5
+    je bayz
+    call GetOperandValueUser2
+    pusha
+    cmp cf2,0
+    je zero_ror_loop
+    STC
+    jmp start_ror_loop
+zero_ror_loop:
+    CLC
+start_ror_loop:
+    mov ax,Operand1Value
+     ;SetCursor 26,16,0
+     ;PrintMessage Operand1Value
+    AsciiToNumber Operand2,0,Operand2Value
+     ;SetCursor 26,18,0
+     ;PrintMessage Operand2Value
+    mov cx,Operand2Value
+    mov ch,0
+    rcl ax,cl
+    mov Operand1Value,ax
+    adc CheckCarry,0
+    mov bl,CheckCarry
+    mov CF1,bl
+    mov CheckCarry,0
+    popa
+    call LoadOperandValueUser2
+    jmp msh_bayz
+
 nop_loop:
+    cmp Operand1Type,0
+    jne bayz
+    cmp Operand2Type,0
+    jne bayz
+    jmp msh_bayz
+
 add_loop:
 sub_loop:
 adc_loop:
 sbb_loop:
+
 or_loop:
     cmp CurCommand+2,' '
     jne bayz
+
 xor_loop:
 and_loop:
 mov_loop:
-rcl_loop:
-rcr_loop:
+
 
 
 bayz:  
