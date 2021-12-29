@@ -81,7 +81,7 @@ endm DrawLine
 PrintMessage MACRO MyMessage 
     pusha
     mov AH,9h
-    mov bl,Purple
+    mov bl,Purple ; hassa eno malosh lazma
     lea DX,MyMessage
     int 21h
     popa
@@ -1189,6 +1189,59 @@ Khalas:
     ret
 ChatWindow endp 
 
+;-------Validating two operands-------
+
+Validate2Operands proc near
+    mov OK, 0
+
+    cmp Operand1Type, 0
+    je operandTypeMismatch
+
+    cmp Operand1Type, 1
+    je operandoneReg8
+
+    cmp Operand1Type, 2
+    je operandoneReg16
+
+    cmp Operand1Type, 3
+    je operand1memory
+
+    cmp Operand1Type, 4
+    je operandTypeMismatch
+
+
+    cmp Operand1Type, 5
+    je operandTypeMismatch
+
+
+
+    operandoneReg8:
+        cmp Operand2Type, 2
+        je operandTypeMismatch
+        cmp Operand2Type, 5
+        je operandTypeMismatch
+        mov OK,1
+        jmp Finish
+
+     operandoneReg16:
+        cmp Operand2Type, 1
+        je operandTypeMismatch
+        mov OK,1
+        jmp Finish
+
+
+    operand1memory:
+        cmp Operand2Type, 3
+        je operandTypeMismatch
+        mov OK,1
+        jmp Finish
+
+    operandTypeMismatch:
+        mov OK,0
+    Finish:
+ret
+endp Validate2Operands
+
 
 ;-------Checking cursor position to scroll-------
 CheckCursor proc near
@@ -1243,8 +1296,7 @@ WriteCommand proc
     SetCursor UserCommand2Col,UserCommand2row,0
     ReadMessage UserCommand2
     UpperToLower UserCommand2
-    call excCommand
-
+   call excCommand
     ret
 endp WriteCommand
 
@@ -1316,7 +1368,14 @@ excCommand proc
     cmp OK,0
     je bayz
     call GetOperandTwo
+    call ValidateOp2
+    cmp OK,0
+    je bayz
     call TypeOp
+    call Validate2Operands
+
+    cmp  OK, 0
+    je   bayz
  SetCursor 26,12,0
  PrintMessage Operand2
    SetCursor 26,14,0
@@ -1629,6 +1688,8 @@ nop_loop:
     jmp msh_bayz
 
 add_loop:
+
+    
 sub_loop:
 adc_loop:
 sbb_loop:
@@ -1640,6 +1701,7 @@ or_loop:
 xor_loop:
 and_loop:
 mov_loop:
+jmp msh_bayz
 
 
 
@@ -1818,7 +1880,7 @@ compare_memory:
       add bx,4
       cmp bx,83
       je not_found_op1
-      jmp compare_based
+      jmp compare_memory
 
  found_op1:    
       mov OK,1
@@ -1832,6 +1894,70 @@ finished_op1:
     ret
 endp ValidateOp1
 
+
+
+;-------Validate Operand 2-------
+ValidateOp2 proc
+
+      pusha
+      ;compare Curr_Command with command at loop_index
+      mov OK,0
+      mov bx,0
+
+compare_registers2:
+      lea si,AX_op[bx]
+      lea di,Operand2
+      mov cx,3
+      REPE CMPSB
+      cmp cx,0
+      je found_op2
+      add bx,3
+      cmp bx,48
+      je compare_based2
+      jmp compare_registers2
+
+compare_based2:  
+      lea si,AX_op[bx]
+      lea di,Operand2
+      mov cx,4
+      REPE CMPSB
+      cmp cx,0
+      je found_op2
+      add bx,5
+      cmp bx,63
+      je compare_memory2
+      jmp compare_based2
+
+compare_memory2:
+      lea si,AX_op[bx]
+      lea di,Operand2
+      mov cx,3
+      REPE CMPSB
+      cmp cx,0
+      je found_op2
+      add bx,4
+      cmp bx,83
+      je compare_immediateNumber2
+      jmp compare_memory2
+
+
+compare_immediateNumber2:
+    CheckImmediate Operand2, ok
+    cmp ok,0
+    je not_found_op2
+
+
+ found_op2:    
+      mov OK,1
+      jmp finished_op2    
+
+ not_found_op2:
+     mov OK,0   
+     
+finished_op2:
+    popa
+    ret
+endp ValidateOp2
 
 ;------Get Type of Operand-------
 ;------0 -> false type-----------
@@ -2328,10 +2454,9 @@ je user2_bp
 user2_bp:
        AsciiToNumber BP_Reg_Value1,0,Operand1Value
        jmp finished_GetOperandValueUser2 
-
-BXidxisOP2:
-SIidxisOP2:
-DIidxisOP2:
+ BXidxisOP2:
+ SIidxisOP2:
+ DIidxisOP2:
  
 
      
