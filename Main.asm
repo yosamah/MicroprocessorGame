@@ -891,12 +891,6 @@ ChatMessage             db 70,?,70 dup('$')
 ChatMessage2            db ?,'$'
 test2                   db 25,?,25 dup('$')
 
-;TESTING
-test3                   dw 93
-test4                   dw 30
-test5                   dw 120
-test6                   dw 70
-
 ;Global window variables
 WindowStart             equ 0
 WindowEndX              equ 80
@@ -1005,6 +999,36 @@ CurrUser                db ?
 
 CurReg                  db ?  
 
+;------GAME Variables-------
+;TESTING
+test3                   dw 93
+test4                   dw 30
+test5                   dw 120
+test6                   dw 70
+;;
+gunX                   db 120   ;;Gunner coordinates
+gunY                   db 70
+
+gunX2                   db 250   ;;Gunner coordinates
+gunY2                   db 70
+
+gunXS                   db 120   ;;Gunner coordinates
+gunYS                   db 70
+
+gunSC                   db ?
+
+gunShape                db 'W','$'
+
+bulletX                 db ?   ;; Bullet coordinates and its state
+bulletY                 db ?
+IsFired                 db ?
+
+;;Scan Codes
+Arrow_Up                equ 48h
+Arrow_Down              equ 50h
+Arrow_Right             equ 4Dh
+Arrow_Left              equ 4Bh
+
 
 ;Colors
 Black                   equ 0
@@ -1047,23 +1071,85 @@ main endp
 
 ;---------------------Proceduers---------------------
 
+;-------Drawing Gun-------
+DrawingGun proc
 
+SetCursor gunX,gunY,0 
+    PrintCharGraphics gunShape,Cyan,1
+    
+    mov ah,01h ;Get key without waiting
+    int 16h
 
+    cmp ah,Arrow_Left
+    je Go_left
+    cmp ah,Arrow_Right
+    je Go_right
+    cmp ah,Arrow_Down
+    je Go_down
+    cmp ah,Arrow_Up
+    je Go_up    
 
+    mov ah,7  ;Consuming the key
+    int 21h
 
+    Go_left:  
+        SetCursor gunX,gunY,0 ;moving the cursor to the old pos to delete the old figure
+        dec gunX   
+        mov ah,7  
+        int 21h       
+        jmp endd
+    Go_right:   
+        SetCursor gunX,gunY,0 
+        inc gunX       
+        mov ah,7  
+        int 21h      
+        jmp endd
+    Go_up:   
+     SetCursor gunX,gunY,0
+        dec gunY                         
+        mov ah,7  
+        int 21h
+        jmp endd
+    Go_down: 
+     SetCursor gunX,gunY,0
+        inc gunY                      
+        mov ah,7  
+        int 21h
+        jmp endd
+endd:     
+    PrintCharGraphics gunShape,Black,1 
 
-videotest proc near
+endp DrawingGun
+
+;-------Flying objects-------
+FlyingObj proc near
+
     mov cx,62
-
-   
-    lef:
+lef:
     push cx
+
     DrawFilledRectangle test3,test4,test5,test6,LightGreen,LightGreen
+    ;;Time Delay 1 tick delay (18.2/sec)
+    mov bp, 43690
+    mov si, 43690
+    delay2:
+    dec bp
+    nop
+    jnz delay2
+    delay1:
+    dec si
+    cmp si,0    
+    jnz delay1
+    ; end delay
     DrawFilledRectangle test3,test4,test5,test6,Black,Black
+    
+    ;if not valid -1 in points and take the other user command
+    
     pop cx
-    inc test3
-    ;inc test4
-    inc test5
+    ;inc test3
+    inc test4
+    ;inc test5
+    inc test6
     dec CX
     jnz lef
     ;DrawFilledRectangle test3,test4,test5,test6,Purple,White
@@ -1074,7 +1160,7 @@ videotest proc near
     mov test5,120                   
     mov test6,70        
 
-     lef2:
+lef2:
     push cx
     DrawFilledRectangle test3,test4,test5,test6,LightCyan,LightCyan
     DrawFilledRectangle test3,test4,test5,test6,Black,Black
@@ -1082,12 +1168,13 @@ videotest proc near
     inc test3
     ;inc test4
     inc test5
+    ;inc test6
     dec CX
     jnz lef2
     
-
     ret
-endp videotest
+endp FlyingObj
+
 
 ;-------MainScreen-------
 MainScreen proc near
@@ -1228,10 +1315,10 @@ GetEnter ENDP
 
 WriteCommand proc
     mov CurrUser,1
-    SetCursor UserCommand1Col,UserCommand1row,0
-    ReadMessage UserCommand1
-    UpperToLower UserCommand1
-    call excCommand
+    ;SetCursor UserCommand1Col,UserCommand1row,0
+    ;ReadMessage UserCommand1
+    ;UpperToLower UserCommand1
+    ;call excCommand
     ;check if command is valid -> change in the registers
 
     ;if not valid -1 in points and take the other user command
@@ -1240,10 +1327,12 @@ WriteCommand proc
     ;PrintMessage UserCommandSpaces
     
     mov CurrUser,2
-    SetCursor UserCommand2Col,UserCommand2row,0
-    ReadMessage UserCommand2
-    UpperToLower UserCommand2
-    call excCommand
+    ;SetCursor UserCommand2Col,UserCommand2row,0
+    ;ReadMessage UserCommand2
+    ;UpperToLower UserCommand2
+    ;call excCommand
+
+    call FlyingObj
 
     ret
 endp WriteCommand
