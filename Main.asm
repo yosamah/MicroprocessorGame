@@ -311,10 +311,10 @@ LOCAL looping,rest,rest2
     mov bx,0
     mov cl,10h
 looping:
-    mov al,current
+    mov al,byte ptr current
     mov ah,0
     div cl
-    mov current,ah 
+    mov byte ptr current,ah 
     mov ah,0
     cmp al,0Ah
     jb rest2
@@ -1140,6 +1140,10 @@ endp DrawingGun
 ;-------Flying objects-------
 FlyingObj proc near
 
+    ;First:
+    ;call DrawingGun
+    ;jmp First
+
     mov cx,62
 lef:
     push cx
@@ -1327,72 +1331,55 @@ GetEnter Proc
     SetCursor WindowStart,WindowStart,0
     RET
 GetEnter ENDP
-;-------Writing commands-------
 
+;-------Writing commands-------
 WriteCommand proc
     mov CurrUser,1
-    ;SetCursor UserCommand1Col,UserCommand1row,0
-    ;ReadMessage UserCommand1
-    ;UpperToLower UserCommand1
-    ;call excCommand
+    SetCursor UserCommand1Col,UserCommand1row,0
+    ReadMessage UserCommand1
+    UpperToLower UserCommand1
+    call excCommand
     ;check if command is valid -> change in the registers
 
     ;if not valid -1 in points and take the other user command
     
-    ;SetCursor UserCommand1Col,UserCommand1row,0     2 commands
-    ;PrintMessage UserCommandSpaces
+    SetCursor UserCommand1Col,UserCommand1row,0     2 commands
+    PrintMessage UserCommandSpaces
     
     mov CurrUser,2
-    ;SetCursor UserCommand2Col,UserCommand2row,0
-    ;ReadMessage UserCommand2
-    ;UpperToLower UserCommand2
-    ;call excCommand
+    SetCursor UserCommand2Col,UserCommand2row,0
+    ReadMessage UserCommand2
+    UpperToLower UserCommand2
+    call excCommand
 
-    call FlyingObj
+   ;call FlyingObj
 
     ret
 endp WriteCommand
 
-
-;-------Pick Command-------
-PickCommand proc
-    pusha
-    lea si, UserCommand1+2
-    lea di, incCommand
-    mov cx, 3
-    REPE CMPSB
-    cmp cx,0
-    jne next
-    
-    INCAcc:
-    pusha
-    mov SI,offset UserCommand1+2
-    mov DI,offset CurCommand
-    mov cl,UserCommand1+1
-    mov ch,0
-    REP MOVSW;Copies the first 10 words from SI to DI
-    popa
-
-    ;excIncCommand 1
-   
-    
-    next:
-    popa
-    
-    ret
-ENDP PickCommand
-
-
 ;-------Execute Command-------
 excCommand proc
     
-    pusha
-    ;moving UserCommand1 into CurCommand
-    mov SI,offset UserCommand1+2
-    mov DI,offset CurCommand
-    mov cl,UserCommand1+1
-    mov ch,0
-    REP MOVSB
+pusha
+    ;moving UserCommand into CurCommand
+    cmp CurrUser,1
+    je excCommand_User1
+
+        mov SI,offset UserCommand2+2
+        mov DI,offset CurCommand
+        mov cl,UserCommand2+1
+        mov ch,0
+        REP MOVSB
+        jmp excCommand_start
+
+    excCommand_User1:
+        mov SI,offset UserCommand1+2
+        mov DI,offset CurCommand
+        mov cl,UserCommand1+1
+        mov ch,0
+        REP MOVSB
+
+    excCommand_start:
     popa
 
     GetStringSize CurCommand,actualSizeCommand
@@ -1422,11 +1409,10 @@ excCommand proc
     je bayz
     call GetOperandTwo
     call TypeOp
-;SetCursor 26,12,0
-;PrintMessage Operand2
-;SetCursor 26,14,0
-;PrintMessage Operand2Type
-
+ ;SetCursor 26,12,0
+ ;PrintMessage Operand2
+ ;SetCursor 26,14,0
+ ;PrintMessage Operand2Type
 
     CompareStrings Op_to_Execute,incCommand,4,OK
     cmp OK,1
@@ -1749,8 +1735,8 @@ jmp msh_bayz
 
 
 bayz:  
- SetCursor 15,20,0
- PrintMessage ChatStatusMSG1
+ ;SetCursor 15,20,0
+ ;PrintMessage ChatStatusMSG1
 msh_bayz:
 RET
 ENDP excCommand
@@ -2517,7 +2503,7 @@ axlod_2:
        jmp finished_LoadOperandValueUser
 
  ALisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
  je allod_2  
        NumbertoAscii4byte Operand1Value,AL_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2535,7 +2521,7 @@ ahlod_2:
        jmp finished_LoadOperandValueUser
 
  BXisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
  je bxlod_2  
        NumbertoAscii4byte Operand1Value,BX_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2544,16 +2530,16 @@ bxlod_2:
        jmp finished_LoadOperandValueUser
 
  BLisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
 je bllod_2  
-       NumbertoAscii4byte Operand1Value,BL_Reg_Value2
+       NumbertoAscii2byte Operand1Value,BL_Reg_Value2
        jmp finished_LoadOperandValueUser
 bllod_2:
-       NumbertoAscii4byte Operand1Value,BL_Reg_Value1
+       NumbertoAscii2byte Operand1Value,BL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  BHisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
 je bhlod_2  
        NumbertoAscii4byte Operand1Value,Bh_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2571,7 +2557,7 @@ cxlod_2:
        jmp finished_LoadOperandValueUser
 
  CLisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
  je cllod_2  
        NumbertoAscii4byte Operand1Value,CL_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2580,7 +2566,7 @@ cllod_2:
        jmp finished_LoadOperandValueUser
 
  CHisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
 je chlod_2  
        NumbertoAscii4byte Operand1Value,CH_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2589,7 +2575,7 @@ chlod_2:
        jmp finished_LoadOperandValueUser
 
  DXisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
 je dxlod_2  
        NumbertoAscii4byte Operand1Value,DX_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2598,7 +2584,7 @@ dxlod_2:
        jmp finished_LoadOperandValueUser
 
  DLisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
 je dllod_2  
        NumbertoAscii4byte Operand1Value,DL_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2607,7 +2593,7 @@ dllod_2:
        jmp finished_LoadOperandValueUser
 
  DHisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
 je dhlod_2  
        NumbertoAscii4byte Operand1Value,DH_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2616,16 +2602,16 @@ dhlod_2:
        jmp finished_LoadOperandValueUser
 
  SIisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
 je silod_2  
        NumbertoAscii4byte Operand1Value,SI_Reg_Value2
        jmp finished_LoadOperandValueUser
 silod_2:
        NumbertoAscii4byte Operand1Value,SI_Reg_Value1
        jmp finished_LoadOperandValueUser
-
+ 
  DIisLoad:
-cmp CurrUser,2 
+ cmp CurrUser,2 
 je dilod_2  
        NumbertoAscii4byte Operand1Value,DI_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2633,8 +2619,8 @@ dilod_2:
        NumbertoAscii4byte Operand1Value,DI_Reg_Value1
        jmp finished_LoadOperandValueUser
 
-SPisLoad:
-cmp CurrUser,2 
+ SPisLoad:
+ cmp CurrUser,2 
 je splod_2  
        NumbertoAscii4byte Operand1Value,SP_Reg_Value2
        jmp finished_LoadOperandValueUser
@@ -2642,8 +2628,8 @@ splod_2:
        NumbertoAscii4byte Operand1Value,SP_Reg_Value1
        jmp finished_LoadOperandValueUser
 
-BPisLoad:
-cmp CurrUser,2 
+ BPisLoad:
+ cmp CurrUser,2 
 je bplod_2  
        NumbertoAscii4byte Operand1Value,BP_Reg_Value2
        jmp finished_LoadOperandValueUser
