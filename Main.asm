@@ -243,6 +243,22 @@ find_string_size:
 
 endm GetStringSize
 
+;-------Update small registers-------
+UpdateSmallReg Macro  regX, regH, regL
+pusha
+    mov al,  regX[0]
+    mov regH[0], al
+    mov al,  regX[1]
+    mov regH[1], al
+    mov al,  regX[2]
+    mov regL[0], al
+    mov al,  regX[3]
+    mov regL[1], al
+popa
+endm UpdateSmallReg
+
+
+
 ;-------Check String Size-------
 CheckImmediate MACRO Operand,OK
      LOCAL check_all_dig,check_letter,end,cont
@@ -1515,7 +1531,7 @@ pusha
     ;PrintMessage f1Pressed
     call TypeOp
 
-     ;SetCursor 26,17,0
+    ;SetCursor 26,17,0
     ;PrintMessage escPressed
     ;SetCursor 26,15,0
     ;PrintMessage Operand1TypeInMemory
@@ -1999,6 +2015,15 @@ EmptyTheString Operand2,7
 
 mov Operand1Value, 0
 mov Operand2Value, 0
+
+SetCursor 26,18,0
+PrintMessage AX_Reg_Value2
+SetCursor 26,20,0
+PrintMessage AH_Reg_Value2
+SetCursor 26,22,0
+PrintMessage AL_Reg_Value2
+
+
 
 
 RET
@@ -3229,9 +3254,11 @@ LoadOperandValueUser1 proc
  cmp CurrUser,2 
  je axlod_2  
        NumbertoAscii4byte Operand1Value,AX_Reg_Value2
+       UpdateSmallReg AX_Reg_Value2, AH_Reg_Value2, AL_Reg_Value2
        jmp finished_LoadOperandValueUser
 axlod_2:
        NumbertoAscii4byte Operand1Value,AX_Reg_Value1
+       UpdateSmallReg AX_Reg_Value1, AH_Reg_Value1, AL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  ALisLoad:
