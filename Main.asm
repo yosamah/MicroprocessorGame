@@ -10,13 +10,34 @@ endm Debug
 
 
 ;-------Empty the string-------
-EmptyTheString macro string1,string2,size
+EmptyTheString macro string2,size
+local myLoop
 pusha
-    mov SI,offset string1
-    mov DI,offset string2
+    ;mov SI,offset string1
+    ;mov DI,offset string2
+    ;mov cl,size
+    ;mov ch,0
+    ;REP MOVSB
+    mov si, offset string2
     mov cl,size
     mov ch,0
-    REP MOVSB
+    myLoop:
+        mov [si], '$'
+        inc si
+        dec cx
+        cmp cx, 0
+    jnz myLoop
+               
+    ;mov si, offset string2
+    ;mov cl,size
+    ;mov ch,0
+    ;myLoop:
+    ;    mov [si], '$'
+    ;    inc si
+    ;    dec cx
+    ;    cmp cx, 0
+    ;jnz myLoop
+   
 popa
 endm EmptyTheString
 
@@ -964,20 +985,21 @@ andCommand              db 'and$'
 movCommand              db 'mov$'
 rclCommand              db 'rcl$'
 rcrCommand              db 'rcr$'
+orCommand               db 'or $'
 popCommand              db 'pop$'
 poppCommand             db 'pop$'
 pushCommand             db 'push$'
-orCommand               db 'or $'
+
 found_cmd               db 0
 Op_to_Execute           db 8 dup('$')
 EmptyOp                 db 5 dup('$')
 OK                      db ?
 OperandLength           dw ?
-Operand1                db 6 dup('$')
+Operand1                db 7 dup('$')
 Operand1Type            db 0, '$'
 Operand1Value           dw ?, '$'
 startOperand2           dw ?, '$'
-Operand2                db 6 dup('$')
+Operand2                db 7 dup('$')
 Operand2Type            db 0, '$'
 Operand2Value           dw ?, '$'
 
@@ -1442,8 +1464,6 @@ pusha
     cmp found_cmd,0
     je bayz
 
- SetCursor 26,10,0
- PrintMessage Op_to_Execute
 
 
     ; jumping to found command
@@ -1472,6 +1492,9 @@ pusha
     cmp OK,0
     je bayz
   
+    ;SetCursor 26,13,0
+    ;PrintMessage EndProg
+    
     ;NumbertoAscii4byte  Operand1TypeInMemory, Operand1TypeInMemoryAs
     ;single operand commands
 
@@ -1488,15 +1511,22 @@ pusha
     call ValidateOp2
     cmp OK,0
     je bayz
+    ;SetCursor 26,15,0
+    ;PrintMessage f1Pressed
     call TypeOp
+
+     ;SetCursor 26,17,0
+    ;PrintMessage escPressed
     ;SetCursor 26,15,0
     ;PrintMessage Operand1TypeInMemory
 
     call Validate2Operands
     cmp OK,0
     je bayz
- SetCursor 26,12,0
- PrintMessage Operand2TypeInMemory
+
+  ; SetCursor 26,18,0
+   ; PrintMessage Welcome
+
  ;SetCursor 26,14,0
  ;PrintMessage Operand2Type
 
@@ -1778,7 +1808,7 @@ start_rcr_loop:
      ;PrintMessage Operand2Value
     mov cx,Operand2Value
     mov ch,0
-    rcl ax,cl
+    rcr ax,cl ; ghalat el mafrood rcr
     mov Operand1Value,ax
     adc CheckCarry,0
     mov bl,CheckCarry
@@ -1796,19 +1826,151 @@ nop_loop:
     jmp msh_bayz
 
 add_loop:
+    Call GetOperandValueUser2
+    ;SetCursor 26,16,0
+    ;PrintMessage Operand2
+    Call GetOperandValueUser1
+    ;SetCursor 26,18,0
+    ;PrintMessage Operand1
+    pusha
+    mov ax,Operand1Value
+    mov bx,Operand2Value
+    add ax,bx
+    mov Operand1Value,ax
+    call  CheckCurrentUserCarry
+    popa
+    call LoadOperandValueUser1
+    jmp msh_bayz
+
 sub_loop:
+    Call GetOperandValueUser2
+    ;SetCursor 26,16,0
+    ;PrintMessage Operand2
+    Call GetOperandValueUser1
+    ;SetCursor 26,18,0
+    ;PrintMessage Operand1
+    pusha
+    mov ax,Operand1Value
+    mov bx,Operand2Value
+    sub ax,bx
+    mov Operand1Value,ax
+    call  CheckCurrentUserCarry
+    popa
+    call LoadOperandValueUser1
+    jmp msh_bayz
+
 adc_loop:
+    Call GetOperandValueUser2
+    ;SetCursor 26,16,0
+    ;PrintMessage Operand2
+    Call GetOperandValueUser1
+    ;SetCursor 26,18,0
+    ;PrintMessage Operand1
+    pusha
+    call LoadCurrentUsercarry
+    mov ax,Operand1Value
+    mov bx,Operand2Value
+    adc ax,bx
+    mov Operand1Value,ax
+    call  CheckCurrentUserCarry
+    popa
+    call LoadOperandValueUser1
+    jmp msh_bayz
+
 sbb_loop:
 
+     Call GetOperandValueUser2
+    ;SetCursor 26,16,0
+    ;PrintMessage Operand2
+    Call GetOperandValueUser1
+    ;SetCursor 26,18,0
+    ;PrintMessage Operand1
+    pusha
+    call LoadCurrentUsercarry
+    mov ax,Operand1Value
+    mov bx,Operand2Value
+    sbb ax,bx
+    mov Operand1Value,ax
+    call  CheckCurrentUserCarry
+    popa
+    call LoadOperandValueUser1
+    jmp msh_bayz
+
 or_loop:
+    ;SetCursor 26,16,0
+    ;PrintMessage orCommand
     cmp CurCommand+2,' '
     jne bayz
+    ;Validaate operand 1
+    call GetOperandOne
+    call ValidateOp1
+    cmp OK,0
+    je bayz
+    ;Validaate operand 2
+    call GetOperandTwo
+    call ValidateOp2
+    cmp OK,0
+    je bayz
+    ;SetCursor 26,15,0
+    ;PrintMessage f1Pressed
+    call TypeOp
+    call Validate2Operands
+    cmp OK,0
+    je bayz
+
+    Call GetOperandValueUser2
+    ;SetCursor 26,16,0
+    ;PrintMessage Operand2
+    Call GetOperandValueUser1
+    ;SetCursor 26,18,0
+    ;PrintMessage Operand1
+    pusha
+    mov ax,Operand1Value
+    mov bx,Operand2Value
+    or ax,bx
+    mov Operand1Value,ax
+    call  CheckCurrentUserCarry
+    popa
+    call LoadOperandValueUser1
+    jmp msh_bayz
 
 xor_loop:
+    Call GetOperandValueUser2
+    ;SetCursor 26,16,0
+    ;PrintMessage Operand2
+    Call GetOperandValueUser1
+    ;SetCursor 26,18,0
+    ;PrintMessage Operand1
+    pusha
+    mov ax,Operand1Value
+    mov bx,Operand2Value
+    xor ax,bx
+    mov Operand1Value,ax
+    call  CheckCurrentUserCarry
+    popa
+    call LoadOperandValueUser1
+    jmp msh_bayz
+
 and_loop:
+    Call GetOperandValueUser2
+    ;SetCursor 26,16,0
+    ;PrintMessage Operand2
+    Call GetOperandValueUser1
+    ;SetCursor 26,18,0
+    ;PrintMessage Operand1
+    pusha
+    mov ax,Operand1Value
+    mov bx,Operand2Value
+    and ax,bx
+    mov Operand1Value,ax
+    call  CheckCurrentUserCarry
+    popa
+    call LoadOperandValueUser1
+    jmp msh_bayz
+
 mov_loop:
 
-    cmp Operand2Type,4
+    ;cmp Operand2Type,4
 
     ;Call GetOperandValueUser2
     Call GetOperandValueUser1
@@ -1824,18 +1986,68 @@ mov_loop:
 
 
 bayz:  
- SetCursor 15,20,0
+ SetCursor 17,23,0
  PrintMessage ChatStatusMSG1
 msh_bayz:
 
-EmptyTheString EmptyString12,UserCommand1Data,12
-EmptyTheString EmptyString12,UserCommand2Data,12
-EmptyTheString EmptyString6,Operand1,6
-EmptyTheString EmptyString6,Operand2,6
+EmptyTheString UserCommand1Data,12
+EmptyTheString UserCommand2Data,12
+EmptyTheString CurCommand,14
+
+EmptyTheString Operand1,7
+EmptyTheString Operand2,7
+
+mov Operand1Value, 0
+mov Operand2Value, 0
 
 
 RET
 ENDP excCommand
+
+
+;-------Load Current user Carry-------
+
+LoadCurrentUsercarry proc
+    cmp CurrUser, 2
+    je loadCarryUser2
+    cmp CF2, 0
+    jne setCarry
+    jmp clearCarryUser2
+    loadCarryUser2:
+    cmp CF1, 0
+    jne setCarry
+    jmp clearCarryUser2
+
+    setCarry:
+    STC
+    JMP endLoadCarry
+    clearCarryUser2:
+    CLC
+    endLoadCarry:
+
+ret
+endp LoadCurrentUsercarry
+
+
+;-------Check Current user Carry-------
+CheckCurrentUserCarry proc
+pusha
+    adc CheckCarry,0
+    mov bl,CheckCarry
+
+    cmp CurrUser, 2
+    je user2_carry
+        MOV CF2, BL 
+        JMP endSetCarry
+    user2_carry:
+       mov CF1, bl
+
+    endSetCarry:
+    mov CheckCarry,0
+popa
+ret
+endp CheckCurrentUserCarry
+
 
 ;-------Get First Operand-------
 GetOperandOne proc
@@ -2088,9 +2300,7 @@ endp ValidateOp2
 
 Validate2Operands proc near
     mov OK, 0
-   
-    SetCursor 26,19,0
-    PrintMessage Op_to_Execute
+
     cmp Operand1Type, 0 ;nop
     je operandTypeMismatch
 
@@ -2113,8 +2323,7 @@ Validate2Operands proc near
 
 
     operandoneReg8:
-        SetCursor 26,13,0
-        PrintMessage SP_op
+    
         cmp Operand2Type, 2
         je operandTypeMismatch
         cmp Operand2Type, 5
@@ -2123,8 +2332,7 @@ Validate2Operands proc near
         jmp Finish
 
      operandoneReg16:
-         SetCursor 26,14,0
-        PrintMessage BP_op
+       
         cmp Operand2Type, 1
         je operandTypeMismatch
         mov OK,1
@@ -2637,6 +2845,56 @@ OP2MEM:
             jmp finished_GetOperandValueUser1 
 
     memo2:
+    cmp Operand2TypeInMemory, 1
+    jne memo3
+
+        cmp CurrUser,2
+        je user1_DS01
+            AsciiToNumber DS01_Value2,0,Operand2Value
+            jmp finished_GetOperandValueUser1
+        user1_DS01:
+            AsciiToNumber DS01_Value1,0,Operand2Value
+            jmp finished_GetOperandValueUser1 
+
+    memo3:
+    cmp Operand2TypeInMemory, 2
+    jne memo4
+
+        cmp CurrUser,2
+        je user1_DS02
+            AsciiToNumber DS02_Value2,0,Operand2Value
+            jmp finished_GetOperandValueUser1
+        user1_DS02:
+            AsciiToNumber DS02_Value1,0,Operand2Value
+            jmp finished_GetOperandValueUser1 
+
+    memo4:
+    cmp Operand2TypeInMemory, 3
+    jne memo5
+
+        cmp CurrUser,2
+        je user1_DS03
+            AsciiToNumber DS03_Value2,0,Operand2Value
+            jmp finished_GetOperandValueUser1
+        user1_DS03:
+            AsciiToNumber DS03_Value1,0,Operand2Value
+            jmp finished_GetOperandValueUser1 
+
+    memo5:
+    cmp Operand2TypeInMemory, 4
+    jne finished_GetOperandValueUser1
+
+        cmp CurrUser,2
+        je user1_DS04
+            AsciiToNumber DS04_Value2,0,Operand2Value
+            jmp finished_GetOperandValueUser1
+        user1_DS04:
+            AsciiToNumber DS04_Value1,0,Operand2Value
+            jmp finished_GetOperandValueUser1 
+
+
+
+    
 
     jmp finished_GetOperandValueUser1 
 
@@ -2653,7 +2911,7 @@ GetOperandValueUser2 proc
 
     pusha
 
-    cmp Operand2Type,3
+    cmp Operand1Type,3
     je OP1MEM
 
     CompareStrings Operand1,AX_op,3,OK
@@ -2847,6 +3105,54 @@ OP1MEM:
             jmp finished_GetOperandValueUser2 
 
     memo22:
+
+    cmp Operand1TypeInMemory, 1
+    jne memo23
+
+        cmp CurrUser,2
+        je user2_DS01
+            AsciiToNumber DS01_Value2,0,Operand1Value
+            jmp finished_GetOperandValueUser2
+        user2_DS01:
+            AsciiToNumber DS01_Value1,0,Operand1Value
+            jmp finished_GetOperandValueUser2 
+    memo23:
+        cmp Operand1TypeInMemory, 2
+        jne memo24
+
+        cmp CurrUser,2
+        je user2_DS02
+            AsciiToNumber DS02_Value2,0,Operand1Value
+            jmp finished_GetOperandValueUser2
+        user2_DS02:
+            AsciiToNumber DS02_Value1,0,Operand1Value
+            jmp finished_GetOperandValueUser2 
+
+    memo24:
+        cmp Operand1TypeInMemory, 3
+        jne memo25
+
+        cmp CurrUser,2
+        je user2_DS03
+            AsciiToNumber DS03_Value2,0,Operand1Value
+            jmp finished_GetOperandValueUser2
+        user2_DS03:
+            AsciiToNumber DS03_Value1,0,Operand1Value
+            jmp finished_GetOperandValueUser2 
+
+    memo25:
+         cmp Operand1TypeInMemory, 4
+        jne finished_GetOperandValueUser2
+
+        cmp CurrUser,2
+        je user2_DS04
+            AsciiToNumber DS04_Value2,0,Operand1Value
+            jmp finished_GetOperandValueUser2
+        user2_DS04:
+            AsciiToNumber DS04_Value1,0,Operand1Value
+            jmp finished_GetOperandValueUser2 
+
+
     
 finished_GetOperandValueUser2:
     popa
@@ -3068,14 +3374,61 @@ bplod_2:
  DIidxisLoad:
 
  Load_OP1MEM:
+    cmp Operand1TypeInMemory, 0
+    jne makanElawel
     cmp CurrUser,2 
     je Mem0LOD  
-        NumbertoAscii2byte Operand1Value, DS00_Value1
+        NumbertoAscii2byte Operand1Value, DS00_Value2
        jmp finished_LoadOperandValueUser
     Mem0LOD:
-       NumbertoAscii4byte Operand1Value,DS00_Value2
+       NumbertoAscii2byte Operand1Value,DS00_Value1
        jmp finished_LoadOperandValueUser
-    
+    makanElawel:
+        cmp Operand1TypeInMemory, 1
+        jne makanEltany
+        cmp CurrUser,2 
+    je Mem1LOD  
+        NumbertoAscii2byte Operand1Value, DS01_Value2
+       jmp finished_LoadOperandValueUser
+    Mem1LOD:
+       NumbertoAscii2byte Operand1Value,DS01_Value1
+       jmp finished_LoadOperandValueUser
+
+    makanEltany:
+     cmp Operand1TypeInMemory, 2
+        jne makanEltalt
+        cmp CurrUser,2 
+    je Mem2LOD  
+        NumbertoAscii2byte Operand1Value, DS02_Value2
+       jmp finished_LoadOperandValueUser
+    Mem2LOD:
+       NumbertoAscii2byte Operand1Value,DS02_Value1
+       jmp finished_LoadOperandValueUser
+
+    makanEltalt:
+    cmp Operand1TypeInMemory, 3
+        jne makanElrabe3
+        cmp CurrUser,2 
+    je Mem3LOD  
+        NumbertoAscii2byte Operand1Value, DS03_Value2
+       jmp finished_LoadOperandValueUser
+    Mem3LOD:
+       NumbertoAscii2byte Operand1Value,DS03_Value1
+       jmp finished_LoadOperandValueUser
+    makanElrabe3:
+    cmp Operand1TypeInMemory, 4
+        jne finished_LoadOperandValueUser
+        cmp CurrUser,2 
+    je Mem4LOD  
+        NumbertoAscii2byte Operand1Value, DS04_Value2
+       jmp finished_LoadOperandValueUser
+    Mem4LOD:
+       NumbertoAscii2byte Operand1Value,DS04_Value1
+       jmp finished_LoadOperandValueUser
+
+
+
+
 
      
 finished_LoadOperandValueUser:
@@ -3406,27 +3759,54 @@ Refresh proc
     SetCursor 31,8,0
     PrintMessage BP_Reg_Value2
 
-    SetCursor 3,12,0
-    PrintMessage DS00
-    SetCursor 3,14,0
-    PrintMessage DS01
-    SetCursor 3,16,0
-    PrintMessage DS02
-    SetCursor 3,18,0
-    PrintMessage DS03
-    SetCursor 3,20,0
-    PrintMessage DS04
+    ;SetCursor 3,12,0
+    ;PrintMessage DS00
+    ;SetCursor 3,14,0
+    ;PrintMessage DS01
+    ;SetCursor 3,16,0
+    ;PrintMessage DS02
+    ;SetCursor 3,18,0
+    ;PrintMessage DS03
+    ;SetCursor 3,20,0
+    ;PrintMessage DS04
 
-    SetCursor 36,12,0
-    PrintMessage DS00
-    SetCursor 36,14,0
-    PrintMessage DS01
-    SetCursor 36,16,0
-    PrintMessage DS02
-    SetCursor 36,18,0
-    PrintMessage DS03
-    SetCursor 36,20,0
-    PrintMessage DS04
+    ;SetCursor 36,12,0
+    ;PrintMessage DS00
+    ;SetCursor 36,14,0
+    ;PrintMessage DS01
+    ;SetCursor 36,16,0
+    ;PrintMessage DS02
+    ;SetCursor 36,18,0
+    ;PrintMessage DS03
+    ;SetCursor 36,20,0
+    ;PrintMessage DS04
+
+
+    SetCursor 0,12,0
+    PrintMessage DS00_Value1
+    SetCursor 0,14,0
+    PrintMessage DS01_Value1
+    SetCursor 0,16,0
+    PrintMessage DS02_Value1
+    SetCursor 0,18,0
+    PrintMessage DS03_Value1
+    SetCursor 0,20,0
+    PrintMessage DS04_Value1
+
+
+    SetCursor 38,12,0
+    PrintMessage DS00_Value2
+    SetCursor 38,14,0
+    PrintMessage DS01_Value2
+    SetCursor 38,16,0
+    PrintMessage DS02_Value2
+    SetCursor 38,18,0
+    PrintMessage DS03_Value2
+    SetCursor 38,20,0
+    PrintMessage DS04_Value2
+
+
+
      ret
 Refresh endp   
 
