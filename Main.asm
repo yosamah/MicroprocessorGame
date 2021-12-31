@@ -41,6 +41,71 @@ pusha
 popa
 endm EmptyTheString
 
+;------PUT ZERO IN ALL REGISTERS--------------
+;------FOR START GAME AND POWER UP------------
+;------0 for all registers and data segment---
+ZeroALL macro user
+LOCAL user_2_zeroing,user_1_zeroing,ending_zeroall
+    pusha
+    mov al,user
+    cmp al,2 
+    je user_2_zeroing
+    cmp al,1
+    je user_1_zeroing
+    MoveString2Bytes ZerosMSG,DS00_Value1
+    MoveString2Bytes ZerosMSG,DS00_Value2
+    MoveString2Bytes ZerosMSG,DS01_Value1
+    MoveString2Bytes ZerosMSG,DS01_Value2
+    MoveString2Bytes ZerosMSG,DS02_Value1
+    MoveString2Bytes ZerosMSG,DS02_Value2
+    MoveString2Bytes ZerosMSG,DS03_Value1
+    MoveString2Bytes ZerosMSG,DS03_Value2
+    MoveString2Bytes ZerosMSG,DS04_Value1
+    MoveString2Bytes ZerosMSG,DS04_Value2
+
+user_1_zeroing:
+    MoveString4Bytes ZerosMSG,AX_Reg_Value1
+    UpdateSmallReg AX_Reg_Value1,AH_Reg_Value1,AL_Reg_Value1
+
+    MoveString4Bytes ZerosMSG,BX_Reg_Value1
+    UpdateSmallReg BX_Reg_Value1,BH_Reg_Value1,BL_Reg_Value1
+
+    MoveString4Bytes ZerosMSG,CX_Reg_Value1
+    UpdateSmallReg CX_Reg_Value1,CH_Reg_Value1,CL_Reg_Value1
+
+    MoveString4Bytes ZerosMSG,DX_Reg_Value1
+    UpdateSmallReg DX_Reg_Value1,DH_Reg_Value1,DL_Reg_Value1
+
+    MoveString4Bytes ZerosMSG,SI_Reg_Value1
+    MoveString4Bytes ZerosMSG,DI_Reg_Value1
+    MoveString4Bytes ZerosMSG,BP_Reg_Value1
+    MoveString4Bytes ZerosMSG,SP_Reg_Value1
+    cmp al, 1
+    je ending_zeroall
+
+user_2_zeroing:
+    MoveString4Bytes ZerosMSG,AX_Reg_Value2
+    UpdateSmallReg AX_Reg_Value2,AH_Reg_Value2,AL_Reg_Value2
+
+    MoveString4Bytes ZerosMSG,BX_Reg_Value2
+    UpdateSmallReg BX_Reg_Value2,BH_Reg_Value2,BL_Reg_Value2
+
+    MoveString4Bytes ZerosMSG,CX_Reg_Value2
+    UpdateSmallReg CX_Reg_Value2,CH_Reg_Value2,CL_Reg_Value2
+
+    MoveString4Bytes ZerosMSG,DX_Reg_Value2
+    UpdateSmallReg DX_Reg_Value2,DH_Reg_Value2,DL_Reg_Value2
+
+    MoveString4Bytes ZerosMSG,SI_Reg_Value2
+    MoveString4Bytes ZerosMSG,DI_Reg_Value2
+    MoveString4Bytes ZerosMSG,BP_Reg_Value2
+    MoveString4Bytes ZerosMSG,SP_Reg_Value2
+    
+
+ ending_zeroall:   
+    popa
+endm ZeroALL
+
 ;-------Changing to graphics mode-------
 changeGraphicsmode Macro
 
@@ -243,6 +308,31 @@ find_string_size:
 
 endm GetStringSize
 
+;-------MOVE STRING 2 BYTES-------
+MoveString2Bytes Macro  source,dest
+pusha
+    mov al,  source[0]
+    mov dest[0], al
+    mov al,  source[1]
+    mov dest[1], al
+popa
+endm MoveString2Bytes
+
+;-------MOVE STRING 4 BYTES-------
+MoveString4Bytes Macro  source,dest
+pusha
+    mov al,  source[0]
+    mov dest[0], al
+    mov al,  source[1]
+    mov dest[1], al
+    mov al,  source[2]
+    mov dest[2], al
+    mov al,  source[3]
+    mov dest[3], al
+popa
+endm MoveString4Bytes
+
+
 ;-------Update small registers-------
 UpdateSmallReg Macro  regX, regH, regL
 pusha
@@ -295,9 +385,9 @@ check_all_dig:
    ja check_letter
    jmp cont
 check_letter:
-   cmp Operand[si],'A'
+   cmp Operand[si],'a'
    jb end
-   cmp Operand[si],'F'
+   cmp Operand[si],'f'
    ja end
 cont:
    inc si
@@ -336,9 +426,9 @@ looping:
     mov ah,0
     mov al,current[si-1]
     sub al,30h
-    cmp current[si-1],'A'
+    cmp current[si-1],'a'
     jb rest
-    sub al,7
+    sub al,27h
 rest:
     mul cx
     add bx,ax
@@ -422,6 +512,12 @@ ReadMessage MACRO msg
     lea dx,msg
     int 21h
 endm ReadMessage
+
+;-------Read character-------
+ReadChar MACRO
+    mov ah,7
+    int 21h
+endm ReadChar
 
 ;-------Scroll down-------
 Scroll MACRO x1,y1,x2,y2,Color,line
@@ -543,6 +639,75 @@ invalidcharacter:
         
 numbercomplete: 
 ENDM ReadNumber
+
+
+;--------Reading forbidden character from the user----------
+ReadForbidden MACRO Forbidden
+    LOCAL loop_number_main
+    LOCAL invalidcharacter
+    LOCAL forbiddencomplete 
+pusha
+    loop_number_main:  
+    PrintMessage ForbiddenMSG     
+
+    ReadMessage Forbidden
+    UpperToLower Forbidden
+    mov al, Forbidden+2
+
+    cmp al,30h  ; check if input character is less then 0, 
+    jl invalidcharacter 
+    cmp al,39h  ; check if input character is great then 9
+    jbe forbiddencomplete
+    cmp al,'a'
+    jb invalidcharacter
+    cmp al,'z'
+    ja invalidcharacter     
+    jmp forbiddencomplete
+invalidcharacter:
+    mov ah,09h 
+    lea dx, messageinvalidcharacter   
+    int 21h     
+    
+    jmp loop_number_main           
+        
+forbiddencomplete: 
+popa
+ENDM ReadForbidden
+
+;--------Reading Command and Validating It--------
+ReadCommand MACRO UserCommand,UserCommandCol,UserCommandrow,Forbidden
+LOCAL getting_command,checking,found_forbidden,ending_readcommand
+pusha
+    mov ok,0
+    getting_command:
+    SetCursor UserCommandCol,UserCommandrow,0
+    ReadMessage UserCommand
+    UpperToLower UserCommand
+    mov si,offset UserCommand+2
+    mov al, Forbidden
+    checking:
+    cmp [si],'$'
+    je ending_readcommand
+    cmp [si], al 
+    je found_forbidden
+    inc si
+    jmp checking
+found_forbidden:
+    SetCursor UserCommandCol,UserCommandrow,0
+    PrintMessage ForbiddenGameMSG
+    push ax
+    mov ah,0
+    int 16h
+    pop ax
+    SetCursor UserCommandCol,UserCommandrow,0
+    PrintMessage UserCommandSpaces
+    EmptyTheString UserCommand+2,12
+    jmp getting_command
+
+ending_readcommand:
+
+popa
+ENDM ReadForbidden
 
 ;--------Draw pixel----------
 DrawPixel Macro row,col,color
@@ -768,11 +933,13 @@ MainMenu  MACRO
     ;Get Info  of user1 
     GetUserName User1Name
     ReadNumber IntialPoints1
+    ReadForbidden Forbidden2
     call GetEnter
 
     ;Get Info  of user2 
     GetUserName User2Name
     ReadNumber IntialPoints2
+    ReadForbidden Forbidden1
     call GetEnter
     GetMin IntialPoints1,IntialPoints2,MinIP
     pusha
@@ -791,18 +958,28 @@ ENDM MainMenu
 .386
 .data 
 
+Winner                  db 0
+
 User1                   db 'USER1$'
 User1Name               DB 12,?,12 DUP('$') , '$'
 realSize1               db ?
 IntialPoints1           dw ?
 IP1                     db '0000$'  ;IntialPoints1 as a message
 
-    
+Forbidden1 LABEL byte
+Forbidden1Size          db 2
+Forbidden1ActualSize    db ?
+Forbidden1Data          db 2 DUP('$') ,'$'
+   
 User2                   db 'USER2$'
 User2Name               DB 12,?,12 DUP('$') , '$'
 realSize2               db ?
 IntialPoints2           dw ?
 IP2                     db '0000$' ;IntialPoints2 as a message 
+Forbidden2 LABEL byte
+Forbidden2Size          db 2
+Forbidden2ActualSize    db ?
+Forbidden2Data          db 2 DUP('$') ,'$'
 
 MinIP                   dw ?       ;Minimum of IntialPoints
     
@@ -810,7 +987,9 @@ EnterName               db 'Please enter your name:',10, 13, '$'
     
 InitialPointsMSG        db 10,13,'Initial points:',10,13, '$'
 PressEnter              db 10,13,'Press ENTER to continue$'
-    
+ForbiddenMSG            db 'Forbidden Character:',10,13, '$'  
+ForbiddenGameMSG        db 'Forbid-Press Key', '$'
+
 ;-----------MainScreenVariables-----------
 Welcome                 db 'Welcome, Press any key to start', '$'
 GoodBye                 db 'GoodBye... ','$'
@@ -828,6 +1007,16 @@ IsESCpressed            db 0
 startrow                db 2
 startcol                db 0
 endcol                  db 20
+
+;--------Winner Screen Variables--------
+WinnerScreenMSG1         db 3,14,2,' The winner is User 1 ',3,14,2,'$'
+WinnerScreenMSG2         db 3,14,2,' The winner is User 2 ',3,14,2,'$'
+WinnerVariable           db '105E$'
+
+;--------Level Screen Variables---------
+LevelInputMSG           db 'Enter Level',10,13, '$'
+LevelVariable           db 3,?,2 DUP('$') ,'$'
+LevelundefinedMsg       db 'Level should be 1 or 2 $'
 
 ;-----------Circle variables-----------
 XC                      dw 50
@@ -925,6 +1114,8 @@ DS01_Value2               db '00', '$'
 DS02_Value2               db '00', '$'
 DS03_Value2               db '00', '$'
 DS04_Value2               db '00', '$'
+
+ZerosMSG                  db '0000', '$'
 
 ;Geting username variables 
 MulNmber                db 10
@@ -1049,7 +1240,7 @@ EmptyString12          db 12 dup('$')
 EmptyString6           db 6 dup('$')
 
 
-UserCommandSpaces       db 14 dup(' '),'$'
+UserCommandSpaces       db 17 dup(' '),'$'
 
 
 UserCommand1Col         db 0
@@ -1278,7 +1469,6 @@ MainScreen proc near
         SetCursor 24, 12, 0
         PrintMessage EndProg
         DrawLine 0,20,80,0,0fh,0,'-'
-
     myLoop:
         mov ah,0
         int 16h
@@ -1295,6 +1485,7 @@ MainScreen proc near
         SetCursor 0, 21, 0
         PrintMessage f2Pressed
         mov IsF2pressed, 1
+        call LevelScreen
         changeGraphicsmode
         call GameScreen
         jmp finishd
@@ -1314,6 +1505,52 @@ MainScreen proc near
     RET
 endp MainScreen
 
+
+;-------Level Screen-------
+LevelScreen proc near
+    pusha
+    changeTextmode
+    ClearScreen WindowStart,WindowStart,WindowEndX,WindowEndY,0
+starting_levelscreen:
+    SetCursor 0,10,0
+    PrintMessage LevelInputMSG
+    ReadMessage LevelVariable
+    cmp LevelVariable+2,'1'
+    je ending_levelscreen
+    cmp LevelVariable+2,'2'
+    je ending_levelscreen
+    SetCursor 0,11,0
+    PrintMessage UserCommandSpaces
+    SetCursor 0, 21, 0
+    PrintMessage LevelundefinedMsg
+    jmp starting_levelscreen
+ending_levelscreen:
+    call GetEnter
+    popa
+    RET
+endp LevelScreen
+
+;-------Winner Screen-------
+WinnerScreen proc near
+    pusha
+    changeTextmode
+    ClearScreen WindowStart,WindowStart,WindowEndX,WindowEndY,0
+    cmp winner,1
+    jne Winner_is_User2
+    SetCursor 26,10,0
+    PrintMessage WinnerScreenMSG1
+    jmp ending_WinnerScreen
+Winner_is_User2:
+    SetCursor 26,10,0
+    PrintMessage WinnerScreenMSG2
+
+ending_WinnerScreen:
+    SetCursor 0,23,0
+    call GetEnter
+    MainMenu
+    popa
+    RET
+endp WinnerScreen
 
 ;-------Chat Proc-------
 ChatWindow proc near
@@ -1407,25 +1644,31 @@ GetEnter ENDP
 ;-------Writing commands-------
 WriteCommand proc
     mov CurrUser,1
-    SetCursor UserCommand1Col,UserCommand1row,0
-    ReadMessage UserCommand1
-    UpperToLower UserCommand1
+    ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
+    ;SetCursor UserCommand1Col,UserCommand1row,0
+    ;ReadMessage UserCommand1
+    ;UpperToLower UserCommand1
     call excCommand
     ;check if command is valid -> change in the registers
 
     ;if not valid -1 in points and take the other user command
+    cmp IntialPoints1,0
+    je Ending_WriteCommand
+    cmp IntialPoints2,0
+    je Ending_WriteCommand
     
     SetCursor UserCommand1Col,UserCommand1row,0     2 commands
     PrintMessage UserCommandSpaces
     
     mov CurrUser,2
-    SetCursor UserCommand2Col,UserCommand2row,0
-    ReadMessage UserCommand2
-    UpperToLower UserCommand2
+    ReadCommand UserCommand2,UserCommand2Col,UserCommand2row,Forbidden2Data
+    ;SetCursor UserCommand2Col,UserCommand2row,0
+    ;ReadMessage UserCommand2
+    ;UpperToLower UserCommand2
     call excCommand
 
    ;call FlyingObj
-
+Ending_WriteCommand:
     ret
 endp WriteCommand
 
@@ -1484,7 +1727,9 @@ pusha
     call ValidateOp1
     cmp OK,0
     je bayz
-  
+
+    SetCursor 26,15,0
+    PrintMessage Operand1
     ;SetCursor 26,13,0
     ;PrintMessage EndProg
     
@@ -1506,8 +1751,6 @@ pusha
     je bayz
     call TypeOp
 
-    SetCursor 26,15,0
-    PrintMessage Operand1
     SetCursor 26,17,0
     PrintMessage Operand2
     SetCursor 26,19,0
@@ -1572,6 +1815,7 @@ pusha
     je rcr_loop
 
 inc_loop:
+    call GetOperandTwo
     isEmptyString Operand2,OK
     cmp OK,0
     je bayz
@@ -1585,6 +1829,7 @@ inc_loop:
     jmp msh_bayz
 
 dec_loop:
+    call GetOperandTwo
     isEmptyString Operand2,OK
     cmp OK,0
     je bayz
@@ -1989,10 +2234,20 @@ mul_loop:
 div_loop:
 
 bayz:  
- SetCursor 17,23,0
- PrintMessage ChatStatusMSG1
-msh_bayz:
+    SetCursor 17,23,0
+    PrintMessage ChatStatusMSG1
 
+    cmp CurrUser,2
+    je bayz_user2
+    dec IntialPoints1
+    NumbertoAscii4byte IntialPoints1,IP1
+    jmp msh_bayz
+
+bayz_user2:
+    dec IntialPoints2
+    NumbertoAscii4byte IntialPoints2,IP2
+
+msh_bayz:
 EmptyTheString UserCommand1Data,12
 EmptyTheString UserCommand2Data,12
 EmptyTheString CurCommand,14
@@ -2002,7 +2257,7 @@ EmptyTheString Operand2,7
 
 mov Operand1Value, 0
 mov Operand2Value, 0
-
+call Refresh
 ;SetCursor 26,18,0
 ;PrintMessage AX_Reg_Value2
 ;SetCursor 26,20,0
@@ -3587,6 +3842,8 @@ endp LoadOperandValueUser2
 
 ;-------Game Screen-------
 GameScreen proc
+
+ZeroALL 0
 TheLoop:
     DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+9,0,Purple
     DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+78,0,Purple
@@ -3672,6 +3929,8 @@ TheLoop:
 
     SetCursor 19,0,0
     PrintMessage Levelmsg
+    SetCursor 21,0,0
+    PrintMessage LevelVariable+2
     ;PrintMessage Level
     SetCursor 2,2,0
     PrintMessage AX_Reg
@@ -3750,6 +4009,7 @@ TheLoop:
     SetCursor User1Name+1,0,0
     PrintMessage Semicolon
     Set4Dig IntialPoints1,IP1
+    AsciiToNumber IP1,0,IntialPoints1
     PrintMessage IP1
 
 
@@ -3762,9 +4022,16 @@ TheLoop:
     PrintMessage Semicolon
     popa
     Set4Dig IntialPoints2,IP2
+    AsciiToNumber IP2,0,IntialPoints2
     PrintMessage IP2
-
+    cmp LevelVariable+2,'2'
+    je USER2_GAME_INFO
+    SetCursor 17,0,0
+    PrintMessage Forbidden1+2
+    SetCursor 38,0,0
+    PrintMessage Forbidden2+2
     ;Print the Names for the chat Mode
+USER2_GAME_INFO:
     SetCursor 0,23,0
     PrintMessage User1Name+2
     SetCursor User1Name+1,23,0
@@ -3774,9 +4041,23 @@ TheLoop:
     SetCursor User2Name+1,24,0
     PrintMessage Semicolon
     Call WriteCommand
+
+    cmp IntialPoints1,0
+    je User2isWinner
+    cmp IntialPoints2,0
+    je User1isWinner
     jmp TheLoop
 
+User1isWinner:
+    mov Winner,1
+    jmp ending_GameScreen
 
+User2isWinner:
+    mov Winner,2
+    jmp ending_GameScreen
+
+ending_GameScreen:
+    call WinnerScreen
     ret
 GameScreen endp
 
@@ -3817,28 +4098,6 @@ Refresh proc
     SetCursor 31,8,0
     PrintMessage BP_Reg_Value2
 
-    ;SetCursor 3,12,0
-    ;PrintMessage DS00
-    ;SetCursor 3,14,0
-    ;PrintMessage DS01
-    ;SetCursor 3,16,0
-    ;PrintMessage DS02
-    ;SetCursor 3,18,0
-    ;PrintMessage DS03
-    ;SetCursor 3,20,0
-    ;PrintMessage DS04
-
-    ;SetCursor 36,12,0
-    ;PrintMessage DS00
-    ;SetCursor 36,14,0
-    ;PrintMessage DS01
-    ;SetCursor 36,16,0
-    ;PrintMessage DS02
-    ;SetCursor 36,18,0
-    ;PrintMessage DS03
-    ;SetCursor 36,20,0
-    ;PrintMessage DS04
-
 
     SetCursor 0,12,0
     PrintMessage DS00_Value1
@@ -3862,9 +4121,85 @@ Refresh proc
     PrintMessage DS03_Value2
     SetCursor 38,20,0
     PrintMessage DS04_Value2
+    
+    ;Check for user 2 winning
+    CompareStrings AX_Reg_Value1,WinnerVariable,5,OK
+    cmp OK,1
+    je User2isWinner
+    CompareStrings BX_Reg_Value1,WinnerVariable,5,OK
+    cmp OK,1
+    je User2isWinner
+    CompareStrings CX_Reg_Value1,WinnerVariable,5,OK
+    cmp OK,1
+    je User2isWinner
+    CompareStrings DX_Reg_Value1,WinnerVariable,5,OK
+    cmp OK,1
+    je User2isWinner
+    CompareStrings SI_Reg_Value1,WinnerVariable,5,OK
+    cmp OK,1
+    je User2isWinner
+    CompareStrings DI_Reg_Value1,WinnerVariable,5,OK
+    cmp OK,1
+    je User2isWinner
+    CompareStrings BP_Reg_Value1,WinnerVariable,5,OK
+    cmp OK,1
+    je User2isWinner
+    CompareStrings SP_Reg_Value1,WinnerVariable,5,OK
+    cmp OK,1
+    je User2isWinner
 
+    ;Check for user 1 winning
+    CompareStrings AX_Reg_Value2,WinnerVariable,5,OK
+    cmp OK,1
+    je User1isWinner
+    CompareStrings BX_Reg_Value2,WinnerVariable,5,OK
+    cmp OK,1
+    je User1isWinner
+    CompareStrings CX_Reg_Value2,WinnerVariable,5,OK
+    cmp OK,1
+    je User1isWinner
+    CompareStrings DX_Reg_Value2,WinnerVariable,5,OK
+    cmp OK,1
+    je User1isWinner
+    CompareStrings SI_Reg_Value2,WinnerVariable,5,OK
+    cmp OK,1
+    je User1isWinner
+    CompareStrings DI_Reg_Value2,WinnerVariable,5,OK
+    cmp OK,1
+    je User1isWinner
+    CompareStrings BP_Reg_Value2,WinnerVariable,5,OK
+    cmp OK,1
+    je User1isWinner
+    CompareStrings SP_Reg_Value2,WinnerVariable,5,OK
+    cmp OK,1
+    je User1isWinner
 
+    SetCursor 0,0,0
+    PrintMessage User1Name+2
+    SetCursor User1Name+1,0,0
+    PrintMessage Semicolon
+    AsciiToNumber IP1,0,IntialPoints1
+    PrintMessage IP1
 
+    SetCursor 23,0,0
+    PrintMessage User2Name+2
+    pusha
+    mov al, [User2Name+1]
+    add al,23
+    SetCursor al,0,0
+    PrintMessage Semicolon
+    popa
+    AsciiToNumber IP2,0,IntialPoints2
+    PrintMessage IP2
+    jmp Refresh_ending
+User1Wins:
+    mov IntialPoints2,0
+    jmp Refresh_ending
+User2Wins:
+    mov IntialPoints1,0
+    jmp Refresh_ending
+
+Refresh_ending:
      ret
 Refresh endp   
 
