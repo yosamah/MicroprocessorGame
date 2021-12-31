@@ -257,6 +257,26 @@ pusha
 popa
 endm UpdateSmallReg
 
+;-------Update big registers-------
+;;;Called when we change AL;;; 
+UpdateBigRegL Macro  regX, regL
+pusha
+    mov al,  regL[0]
+    mov regX[2], al
+    mov al,  regL[1]
+    mov regX[3], al
+popa
+endm UpdateBigRegL
+
+;-------Update big registers-------
+UpdateBigRegH Macro  regX, regH
+pusha
+    mov al,  regH[0]
+    mov regX[0], al
+    mov al,  regH[1]
+    mov regX[1], al
+popa
+endm UpdateBigRegH
 
 
 ;-------Check String Size-------
@@ -290,18 +310,27 @@ end:
 endm CheckImmediate
 
 ;-------Convert from Ascii (hexa) to number-------
+;;;If u know the size send it in "val" 
+;;;if not it automatically calculates size and send 0 in "val"
 AsciiToNumber MACRO current,val,answer
-LOCAL looping,rest
+LOCAL looping,rest,setSize
     
     ;2 for al - 2 bytes
     ;0 for ax - 4 bytes
-
     pusha
-
+    mov ax,val
+    cmp ax,2
+    je setSize
     GetStringSize current,StringSize
     mov si,StringSize
     mov bx,0
     mov cx,1 
+    jmp looping
+
+setSize:
+    mov bx,0
+    mov cx,1 
+    mov si, 2
 
 looping:
     mov ah,0
@@ -602,9 +631,9 @@ Drawcirc Macro x,y,r,color
     mov Radius,r
     mov CircColor, color
     call DrawCircle
-    
 
 ENDM Drawcirc
+
 ;--------Welcome Text----------
 WelcomeText Macro
     SetCursor 23, 8, 0
@@ -614,6 +643,8 @@ WelcomeText Macro
     ClearScreen 0,0,80,25,0Fh
     SetCursor WindowStart,WindowStart,0
 ENDM WelcomeText
+
+
 ;--------GoodBye Text----------
 GoodByeText Macro
     changeTextmode
@@ -623,6 +654,8 @@ GoodByeText Macro
     mov ah,0
     int 16h
 ENDM GoodByeText
+
+
 ;--------Upper to lower case----------
 UpperToLower Macro InputString
     Local loop1,loop2
@@ -646,6 +679,8 @@ pusha
 
 popa
 endm UpperToLower
+
+
 ;--------Set 4 Digits----------
 Set4Dig Macro IntialPoints,IntialPoints_Meg
     pusha
@@ -676,6 +711,8 @@ Set4Dig Macro IntialPoints,IntialPoints_Meg
 
     popa
 ENDM Set4Dig
+
+
 ;--------Get Minimum----------
 GetMin Macro x,y,Min
     Local Exit
@@ -712,65 +749,7 @@ LoadReg Macro AX_Reg_Value,BX_Reg_Value,CX_Reg_Value,DX_Reg_Value,SI_Reg_Value,D
     Exit:
 ENDM LoadReg
 
-
-;-------exc inc Command-------
-excIncCommand Macro UserNum
-    Local U1,skip, findLetter,axsah,bayz,tanyuser
-    mov dl, 3
-    cmp CurCommand+3,' '
-    jne bayz
-    findLetter: ;;;  removes spaces
-        inc dl 
-        ;cmp dl, actualSizeCommand
-        ja bayz
-        mov di, dl
-        cmp CurCommand+di,' '
-    je findLetter
-
-    mov si, CurCommand+di
-    mov di, AX_RegSmall
-    mov cx, 2
-    REPE CMPSB
-    cmp cx, 0  
-    je axsah
-
-
-    
-
-    axsah:
-    mov CurReg,0
-    
-    cmp UserNum,1
-    je U1
-    LoadReg AX_Reg_Value1,BX_Reg_Value1,CX_Reg_Value1,DX_Reg_Value1,SI_Reg_Value1,DI_Reg_Value1,SP_Reg_Value1,BP_Reg_Value1,CF1
-
-
-    jmp skip
-    U1:
-    
-    LoadReg AX_Reg_Value2,BX_Reg_Value2,CX_Reg_Value2,DX_Reg_Value2,SI_Reg_Value2,DI_Reg_Value2,SP_Reg_Value2,BP_Reg_Value2,CF2
-
-    skip:
-    
-    cmp CurReg,0
-    jne bayz
-    inc ax
-    cmp UserNum,1
-    jne tanyuser
-    mov AX_Reg_Value1,ax
-    jmp bayz
-
-    tanyuser:
-    mov AX_Reg_Value2,ax
-
-
-
-    bayz:
-
-
-ENDM excIncCommand
 ;--------Set Brush----------
-
 SetBrush Macro realSize, Color
 
     mov ah,09
@@ -779,6 +758,8 @@ SetBrush Macro realSize, Color
     int 10h
 
 endm SetBrush
+
+
 ;--------Main menu----------
 MainMenu  MACRO 
     
@@ -1002,8 +983,8 @@ movCommand              db 'mov$'
 rclCommand              db 'rcl$'
 rcrCommand              db 'rcr$'
 orCommand               db 'or $'
-popCommand              db 'pop$'
-poppCommand             db 'pop$'
+mulCommand              db 'mul$'
+divCommand              db 'div$'
 pushCommand             db 'push$'
 
 found_cmd               db 0
@@ -1078,8 +1059,8 @@ UserCommand2Col         db 21
 UserCommand2row         db 10
 
 CurCommand              db 14 dup('$')
-actualSizeCommand       dw ?
-CurrUser                db ?
+actualSizeCommand       dw ? , '$'
+CurrUser                db ? , '$'
 ; ax = 0
 ; bx = 1
 ; cx = 2
@@ -1475,12 +1456,9 @@ pusha
 
     GetStringSize CurCommand,actualSizeCommand
 
-
     call GetCommand
     cmp found_cmd,0
     je bayz
-
-
 
     ; jumping to found command
     CompareStrings Op_to_Execute,orCommand,4,OK
@@ -1493,7 +1471,6 @@ pusha
     jne bayz
 
     ;Commands with no operands
-
     CompareStrings Op_to_Execute,clcCommand,4,OK
     cmp OK,1
     je clc_loop
@@ -1527,14 +1504,14 @@ pusha
     call ValidateOp2
     cmp OK,0
     je bayz
-    ;SetCursor 26,15,0
-    ;PrintMessage f1Pressed
     call TypeOp
 
-    ;SetCursor 26,17,0
-    ;PrintMessage escPressed
-    ;SetCursor 26,15,0
-    ;PrintMessage Operand1TypeInMemory
+    SetCursor 26,15,0
+    PrintMessage Operand1
+    SetCursor 26,17,0
+    PrintMessage Operand2
+    SetCursor 26,19,0
+    PrintMessage CurrUser
 
     call Validate2Operands
     cmp OK,0
@@ -1546,20 +1523,26 @@ pusha
  ;SetCursor 26,14,0
  ;PrintMessage Operand2Type
 
+    CompareStrings Op_to_Execute,mulCommand,4,OK
+    cmp OK,1
+    je mul_loop
+
+    CompareStrings Op_to_Execute,divCommand,4,OK
+    cmp OK,1
+    je div_loop
+
     CompareStrings Op_to_Execute,shlCommand,4,OK
     cmp OK,1
     je shl_loop
     CompareStrings Op_to_Execute,shrCommand,4,OK
     cmp OK,1
     je shr_loop
-  
     CompareStrings Op_to_Execute,rorCommand,4,OK
     cmp OK,1
     je ror_loop
     CompareStrings Op_to_Execute,rolCommand,4,OK
     cmp OK,1
     je rol_loop
-    
     CompareStrings Op_to_Execute,addCommand,4,OK
     cmp OK,1
     je add_loop
@@ -1611,7 +1594,7 @@ dec_loop:
     dec ax
     mov Operand1Value,ax
     popa
-    call LoadOperandValueUser2
+    call LoadOperandValueUser1
     jmp msh_bayz
 
 shl_loop:
@@ -1647,7 +1630,7 @@ start_shl_loop:
     mov CF2,bl
     mov CheckCarry,0
     popa
-    call LoadOperandValueUser2
+    call LoadOperandValueUser1
     jmp msh_bayz
 
 shr_loop:
@@ -1683,7 +1666,7 @@ start_shr_loop:
     mov CF2,bl
     mov CheckCarry,0
     popa
-    call LoadOperandValueUser2
+    call LoadOperandValueUser1
     jmp msh_bayz
 
 clc_loop: 
@@ -1723,7 +1706,7 @@ start_ror_loop:
     mov CF2,bl
     mov CheckCarry,0
     popa
-    call LoadOperandValueUser2
+    call LoadOperandValueUser1
     jmp msh_bayz
 
 rol_loop:
@@ -1759,7 +1742,7 @@ start_rol_loop:
     mov CF2,bl
     mov CheckCarry,0
     popa
-    call LoadOperandValueUser2
+    call LoadOperandValueUser1
     jmp msh_bayz
 
 rcl_loop:
@@ -1795,7 +1778,7 @@ start_rcl_loop:
     mov CF2,bl
     mov CheckCarry,0
     popa
-    call LoadOperandValueUser2
+    call LoadOperandValueUser1
     jmp msh_bayz
 
 rcr_loop:
@@ -1831,7 +1814,7 @@ start_rcr_loop:
     mov CF2,bl
     mov CheckCarry,0
     popa
-    call LoadOperandValueUser2
+    call LoadOperandValueUser1
     jmp msh_bayz
 
 nop_loop:
@@ -1985,12 +1968,9 @@ and_loop:
     jmp msh_bayz
 
 mov_loop:
-
     ;cmp Operand2Type,4
-
     ;Call GetOperandValueUser2
     Call GetOperandValueUser1
-
     pusha
     ;mov ax,Operand1Value
     mov bx,Operand2Value
@@ -2000,6 +1980,13 @@ mov_loop:
     call LoadOperandValueUser1
     jmp msh_bayz
 
+mul_loop:
+    pusha
+
+    
+    popa
+
+div_loop:
 
 bayz:  
  SetCursor 17,23,0
@@ -2016,15 +2003,12 @@ EmptyTheString Operand2,7
 mov Operand1Value, 0
 mov Operand2Value, 0
 
-SetCursor 26,18,0
-PrintMessage AX_Reg_Value2
-SetCursor 26,20,0
-PrintMessage AH_Reg_Value2
-SetCursor 26,22,0
-PrintMessage AL_Reg_Value2
-
-
-
+;SetCursor 26,18,0
+;PrintMessage AX_Reg_Value2
+;SetCursor 26,20,0
+;PrintMessage AH_Reg_Value2
+;SetCursor 26,22,0
+;PrintMessage AL_Reg_Value2
 
 RET
 ENDP excCommand
@@ -3016,6 +3000,14 @@ user2_al:
        jmp finished_GetOperandValueUser2
 
 AHisOP2:
+cmp CurrUser,2
+je user2_ah 
+        AsciiToNumber AX_Reg_Value2[0],2,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_ah:
+       AsciiToNumber AX_Reg_Value1[0],2,Operand1Value
+       jmp finished_GetOperandValueUser2
+
 
 BXisOP2:
 cmp CurrUser,2
@@ -3036,6 +3028,13 @@ user2_bl:
        jmp finished_GetOperandValueUser2
 
 BHisOP2:
+cmp CurrUser,2
+je user2_bh 
+        AsciiToNumber BX_Reg_Value2[0],2,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_bh:
+       AsciiToNumber BX_Reg_Value1[0],2,Operand1Value
+       jmp finished_GetOperandValueUser2
 
 CXisOP2:
 cmp CurrUser,2
@@ -3056,6 +3055,13 @@ user2_cl:
        jmp finished_GetOperandValueUser2 
 
 CHisOP2:
+cmp CurrUser,2
+je user2_ch 
+        AsciiToNumber CX_Reg_Value2[0],2,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_ch:
+       AsciiToNumber CX_Reg_Value1[0],2,Operand1Value
+       jmp finished_GetOperandValueUser2
 
 DXisOP2:
 cmp CurrUser,2
@@ -3076,6 +3082,13 @@ user2_dl:
        jmp finished_GetOperandValueUser2 
 
 DHisOP2:
+cmp CurrUser,2
+je user2_dh 
+        AsciiToNumber DX_Reg_Value2[0],2,Operand1Value
+       jmp finished_GetOperandValueUser2
+user2_dh:
+       AsciiToNumber DX_Reg_Value1[0],2,Operand1Value
+       jmp finished_GetOperandValueUser2
 
 SIisOP2:
 cmp CurrUser,2
@@ -3264,100 +3277,122 @@ axlod_2:
  ALisLoad:
  cmp CurrUser,2 
  je allod_2  
-       NumbertoAscii4byte Operand1Value,AL_Reg_Value2
+       NumbertoAscii2byte Operand1Value,AL_Reg_Value2
+       UpdateBigRegL AX_Reg_Value2, AL_Reg_Value2
        jmp finished_LoadOperandValueUser
 allod_2:
-       NumbertoAscii4byte Operand1Value,AL_Reg_Value1
+       NumbertoAscii2byte Operand1Value,AL_Reg_Value1
+       UpdateBigRegL AX_Reg_Value1, AL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  AHisLoad:
  cmp CurrUser,2 
  je ahlod_2  
-       NumbertoAscii4byte Operand1Value,AH_Reg_Value2
+       NumbertoAscii2byte Operand1Value,AH_Reg_Value2
+       UpdateBigRegH AX_Reg_Value2, AH_Reg_Value2
        jmp finished_LoadOperandValueUser
 ahlod_2:
-       NumbertoAscii4byte Operand1Value,AH_Reg_Value1
+       NumbertoAscii2byte Operand1Value,AH_Reg_Value1
+       UpdateBigRegH AX_Reg_Value1, AH_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  BXisLoad:
  cmp CurrUser,2 
  je bxlod_2  
        NumbertoAscii4byte Operand1Value,BX_Reg_Value2
+       UpdateSmallReg BX_Reg_Value2, BH_Reg_Value2, BL_Reg_Value2
        jmp finished_LoadOperandValueUser
 bxlod_2:
        NumbertoAscii4byte Operand1Value,BX_Reg_Value1
+       UpdateSmallReg BX_Reg_Value1, BH_Reg_Value1, BL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  BLisLoad:
  cmp CurrUser,2 
 je bllod_2  
        NumbertoAscii2byte Operand1Value,BL_Reg_Value2
+       UpdateBigRegL BX_Reg_Value2, BL_Reg_Value2
        jmp finished_LoadOperandValueUser
 bllod_2:
        NumbertoAscii2byte Operand1Value,BL_Reg_Value1
+       UpdateBigRegL BX_Reg_Value1, BL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  BHisLoad:
  cmp CurrUser,2 
 je bhlod_2  
-       NumbertoAscii4byte Operand1Value,Bh_Reg_Value2
+       NumbertoAscii2byte Operand1Value,Bh_Reg_Value2
+       UpdateBigRegH BX_Reg_Value2, BH_Reg_Value2
        jmp finished_LoadOperandValueUser
 bhlod_2:
-       NumbertoAscii4byte Operand1Value,Bh_Reg_Value1
+       NumbertoAscii2byte Operand1Value,Bh_Reg_Value1
+       UpdateBigRegH BX_Reg_Value1, BH_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  CXisLoad:
  cmp CurrUser,2 
  je cxlod_2  
        NumbertoAscii4byte Operand1Value,CX_Reg_Value2
+       UpdateSmallReg CX_Reg_Value2, CH_Reg_Value2, CL_Reg_Value2
        jmp finished_LoadOperandValueUser
 cxlod_2:
        NumbertoAscii4byte Operand1Value,CX_Reg_Value1
+       UpdateSmallReg CX_Reg_Value1, CH_Reg_Value1, CL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  CLisLoad:
  cmp CurrUser,2 
  je cllod_2  
-       NumbertoAscii4byte Operand1Value,CL_Reg_Value2
+       NumbertoAscii2byte Operand1Value,CL_Reg_Value2
+       UpdateBigRegL CX_Reg_Value2, CL_Reg_Value2
        jmp finished_LoadOperandValueUser
 cllod_2:
-       NumbertoAscii4byte Operand1Value,CL_Reg_Value1
+       NumbertoAscii2byte Operand1Value,CL_Reg_Value1
+       UpdateBigRegL CX_Reg_Value1, CL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  CHisLoad:
  cmp CurrUser,2 
 je chlod_2  
-       NumbertoAscii4byte Operand1Value,CH_Reg_Value2
+       NumbertoAscii2byte Operand1Value,CH_Reg_Value2
+       UpdateBigRegH CX_Reg_Value2, CH_Reg_Value2
        jmp finished_LoadOperandValueUser
 chlod_2:
-       NumbertoAscii4byte Operand1Value,CH_Reg_Value1
+       NumbertoAscii2byte Operand1Value,CH_Reg_Value1
+       UpdateBigRegH CX_Reg_Value1, CH_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  DXisLoad:
  cmp CurrUser,2 
 je dxlod_2  
        NumbertoAscii4byte Operand1Value,DX_Reg_Value2
+       UpdateSmallReg DX_Reg_Value2, DH_Reg_Value2, DL_Reg_Value2
        jmp finished_LoadOperandValueUser
 dxlod_2:
        NumbertoAscii4byte Operand1Value,DX_Reg_Value1
+       UpdateSmallReg DX_Reg_Value1, DH_Reg_Value1, DL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  DLisLoad:
  cmp CurrUser,2 
 je dllod_2  
-       NumbertoAscii4byte Operand1Value,DL_Reg_Value2
+       NumbertoAscii2byte Operand1Value,DL_Reg_Value2
+       UpdateBigRegL DX_Reg_Value2, DL_Reg_Value2
        jmp finished_LoadOperandValueUser
 dllod_2:
-       NumbertoAscii4byte Operand1Value,DL_Reg_Value1
+       NumbertoAscii2byte Operand1Value,DL_Reg_Value1
+       UpdateBigRegL DX_Reg_Value1, DL_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  DHisLoad:
  cmp CurrUser,2 
 je dhlod_2  
-       NumbertoAscii4byte Operand1Value,DH_Reg_Value2
+       NumbertoAscii2byte Operand1Value,DH_Reg_Value2
+       UpdateBigRegH DX_Reg_Value2, DH_Reg_Value2
        jmp finished_LoadOperandValueUser
 dhlod_2:
-       NumbertoAscii4byte Operand1Value,DH_Reg_Value1
+       NumbertoAscii2byte Operand1Value,DH_Reg_Value1
+       UpdateBigRegH DX_Reg_Value1, DH_Reg_Value1
        jmp finished_LoadOperandValueUser
 
  SIisLoad:
@@ -3452,10 +3487,6 @@ bplod_2:
     Mem4LOD:
        NumbertoAscii2byte Operand1Value,DS04_Value1
        jmp finished_LoadOperandValueUser
-
-
-
-
 
      
 finished_LoadOperandValueUser:
