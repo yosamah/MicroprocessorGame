@@ -137,6 +137,19 @@ ClearScreen MACRO x1,y1,x2,y2,Color
 
 endm ClearScreen
 
+;-------Clear Screen Graphics-------
+ClearScreenGraphics MACRO x1,y1,x2,y2,Color
+
+    mov ax,0600h
+    mov bh,color
+    mov cl,x1
+    mov ch,y1
+    mov dl,x2
+    mov dh,y2
+    int 10h
+
+endm ClearScreenGraphics
+
 ;-------Set cursor-------
 SetCursor MACRO x,y,PageNO
 
@@ -957,17 +970,6 @@ CLCWindow Macro
     PrintMessage UserCommandEmpty+2
     popa
 ENDM CLCWindow
-
-;-----------Draw Player-----------
-DrawPlayer Macro
-    SetCursor ssX,ssY,0
-    PrintMessage spaceship
-ENDM DrawPlayer
-;-----------Update Player position-----------
-UpdatePlayer Macro
-    SetCursor ssX,ssY,0
-    PrintMessage blank
-ENDM UpdatePlayer
 ;----------Store the input of the keyboard--------
 GetKeyPressed Macro
     ;which key is pressed "AL = ASCII char" 
@@ -1001,27 +1003,28 @@ ENDM Drawbullet
 ;------Check Collision------
 Collison Macro
     Local True,checkColRange,false,Done,TaniCol
+    
     pusha
     ;kda bn-check lw 3la nafs el row tyb lw nfs el row bs msh nafs range el coloum nsibooo!!!! akid la yb2a bos taht
     mov ax, bullet_Row
     add ax, bulletsize
     mov bx, objX
-    add bx, objR+4
+    add bx, objR
     cmp ax, bx
     jz checkColRange
     jmp false
     ;Range el col yalaaaaa
-checkColRange:
+checkColRange: ;right col
     mov ax, bullet_col
     mov bx, objY
-    add bx, objR+2
+    add bx, objR
     cmp ax, bx
     jle TaniCol
     jmp false
 TaniCol:
     mov ax, bullet_col
     mov bx, objY
-    sub bx, objR+4
+    sub bx, objR
     cmp ax, bx
     jae True
 jmp false
@@ -1036,7 +1039,7 @@ Done:
     popa
 ENDM Collison
 ;------Bullet Action------
-BulletAction Macro
+BulletAction Macro T
     Local Check,Miss,MabrokKsabtPoint,End
 
     pusha
@@ -1120,12 +1123,13 @@ ENDM FlyingObj
 ;------Draw SpaceShip------
 DrawSpaceShip Macro color
     Local T3alaTani
+    pusha
     mov cx ,sscol
     mov dx ,ssRow
 
     T3alaTani:
     DrawPixel dx,cx,color
-    pusha
+
     inc cx
     mov ax ,cx
     sub ax ,ssCol
@@ -1143,11 +1147,9 @@ DrawSpaceShip Macro color
 ENDM DrawSpaceShip
 ;--------Ship Action---------
 ShipAction Macro
-    Local GameLoop,ExitGame,MoveUp,MoveDown,MoveLeft,MoveRight
+    Local ExitGame,MoveUp,MoveDown,MoveLeft,MoveRight,hit
 
-    DrawSpaceShip White
-GameLoop:
-    GetKeyPressed
+   GetKeyPressed
     mov move,al
 
     cmp move, 'x'
@@ -1167,46 +1169,46 @@ GameLoop:
 
     cmp move ,' '
     je Hit
+    jmp ExitGame
 
 MoveUp:
     cmp ssRow,128           ;upper limit
-    jz GameLoop
+    jz ExitGame
     DrawSpaceShip black
     Dec ssRow
     dec bullet_Row
     DrawSpaceShip White
-    jmp GameLoop
+    jmp ExitGame
 MoveDown:
     cmp ssRow,168           ;lovwer limit
-    jz GameLoop
+    jz ExitGame
     DrawSpaceShip black
     inc ssRow
     inc bullet_Row
     DrawSpaceShip White
-    jmp GameLoop
+    jmp ExitGame
 MoveLeft:
     cmp ssCol,32            ;left limit
-    jz GameLoop
+    jz ExitGame
     DrawSpaceShip black 
     Dec ssCol
     dec bullet_col
     DrawSpaceShip White
-    jmp GameLoop
+    jmp ExitGame
 MoveRight:
     cmp ssCol,136           ;left limit
-    jz GameLoop
+    jz ExitGame
     DrawSpaceShip black
     inc ssCol
     inc bullet_col
     DrawSpaceShip White
-    jmp GameLoop
+    jmp ExitGame
 Hit:
-    BulletAction
-    jmp GameLoop
+    ;BulletAction
+    jmp ExitGame
+
 
 ExitGame:
-    mov GameEnd,1
-
 ENDM ShipAction
 
 ;--------Main menu----------
@@ -1399,7 +1401,7 @@ DS02_Value2             db '00', '$'
 DS03_Value2             db '00', '$'
 DS04_Value2             db '00', '$'
 
-ZerosMSG                  db '0000', '$'
+ZerosMSG                db '0000', '$'
 
 ;Geting username variables 
 MulNmber                db 10
@@ -1522,8 +1524,8 @@ UserCommand2Data        db 14 dup('$')
 
 ;UserCommand2            db 14,?,14 dup('$')
 
-EmptyString12          db 12 dup('$')
-EmptyString6           db 6 dup('$')
+EmptyString12           db 12 dup('$')
+EmptyString6            db 6 dup('$')
 
 
 UserCommandSpaces       db 17 dup(' '),'$'
@@ -1551,27 +1553,13 @@ CurReg                  db ?
 
 ;------GAME Variables-------
 ;TESTING
-test3                   dw 93
+test3                   db 10
 test4                   dw 30
 test5                   dw 120
 test6                   dw 70
 ;;
-gunX                   db 120   ;;Gunner coordinates
-gunY                   db 70
 
-gunX2                   db 250   ;;Gunner coordinates
-gunY2                   db 70
 
-gunXS                   db 120   ;;Gunner coordinates
-gunYS                   db 70
-
-gunSC                   db ?
-
-gunShape                db 'W','$'
-
-bulletX                 db ?   ;; Bullet coordinates and its state
-bulletY                 db ?
-IsFired                 db ?
 
 ;;Scan Codes
 Arrow_Up                equ 48h
@@ -1603,14 +1591,33 @@ spaceship_height        dw 3
 spaceship_width         dw 9
 Blank                   db ' ' , '$'
 ssRow                   dw 168
-ssCol                   dw 80
+
+ssCol                   dw ?
+ss1Col                  dw 80
+ss2Col                  dw 240
+
+;gun Boundry
+Gunx1                   dw 128
+Gunx2                   dw 168
+GunY1                   dw ?
+GunY2                   dw ?
+
+Gun1y1                  dw 32
+Gun1y2                  dw 136
+
+Gun2y1                  dw 180
+Gun2y2                  dw 284
 
 move                    db ?
 GameEnd                 db 0
 
 bulletsize              dw 2
 bullet_Row              dw 165
-bullet_col              dw 83    
+
+bullet_col              dw ? 
+bullet_1col             dw 83 
+bullet_2col             dw 243 
+
 Time                    db 0
 
 GHit                    db '0', '$' 
@@ -1622,13 +1629,28 @@ RHit_value              db 0
 CHIt_value              db 0
 YHit_value              db 0
 
+
 objR                    dw 4
-objX                   dw 95
-objY                   dw 35
-objColor               db 0ah
+objX                    dw 95
+objY                    dw ?
+
+obj1Y                   dw 35
+obj2Y                   dw 178
+
+YBoundry                dw ?  
+
+Y1Boundry               dw 143
+Y2Boundry               dw 283
+
+objColor                db ?
 
 
 scored                  db 0
+ActionFlag              db 0
+
+Random                  db ?
+curColor                db ?
+
 ;----------------------------------------------
 
 
@@ -1639,7 +1661,6 @@ main proc far
     mov es,ax
 
     MainMenu
-    
 
     mov ah,0
     int 16h  
@@ -1651,31 +1672,217 @@ main endp
 
 ;---------------------Proceduers---------------------
 
+;--------Game-------
 Game Proc
 
-GameLoop:
-    SystemTime
-    cmp dl, Time
-    je GameLoop
-    mov Time ,dl
+pusha
+    cmp CurrUser ,1
+    jz Player1
+    mov ax,obj2Y
+    mov bx,Y2Boundry
+    mov cx,bullet_2col
+    mov dx,Gun2y1
+    mov objY,ax
+    mov YBoundry,bx
+    mov bullet_col,cx
+    mov GunY1,dx
 
-mov di,objY
+    mov ax,Gun2y2
+    mov bx,ss2Col
+    mov GunY2,ax
+    mov ssCol,bx
+    jmp DoneInfo
 
-    cmp objY,143
-    jz kmanMaraa
-    Drawbullet objY,objX,objR,black
-    inc objY
-    cmp objY,143
-    jz KmanMaraa
+    Player1:
+    mov ax,obj1Y
+    mov bx,Y1Boundry
+    mov cx,bullet_1col
+    mov dx,Gun1y1
+    mov objY,ax
+    mov YBoundry,bx
+    mov bullet_col,cx
+    mov GunY1,dx
+
+    mov ax,Gun1y2
+    mov bx,ss1Col
+    mov GunY2,ax
+    mov ssCol,bx
+
+    DoneInfo:
+popa
+
+pusha
+    mov di, 1
+Check:
+
+    cmp di,0
+    jbe EndGame
+    mov ah,2ch
+    int 21h
+
+    mov al,dl 
+    mov ah,0
+    mov bl,4
+    div bl
+    mov Random, ah
+
+    cmp dl,Time
+    je Check
+
+    mov Time,dl
+
+    ;movement of the obj
+    call MoveObject
+    ;drawing the flying obj
+    
     Drawbullet objY,objX,objR,objColor
-    jmp GameLoop
 
-KmanMaraa:
-    mov objY,di
-    jmp GameLoop
-Drawbullet objY,objX,objR,objColor
+    ;Gun movement
+    call MoveGun
+    ;Draw the gun
+    DrawSpaceShip white
+    cmp ActionFlag,1
+    jz MoveBullet
+    ;dec di
+    Jmp Check
+    MoveBullet:
+        pusha
+    mov si,bullet_Row
+    Run:
+    pusha
+        ;to make 0.25 second delay
+        mov cx,0h
+        mov dx,9000h
+        mov ah,86h
+        int 15h
+    popa
+    ;check if the bullet hit any object
+    Collison
+    cmp scored ,1
+    jz MabrokKsabtPoint
 
-DrawSpaceShip White
+    cmp bullet_Row,95
+    jbe miss
+    Drawbullet bullet_col,bullet_Row,bulletsize,black
+    dec bullet_Row
+
+    ;check if the bullet hit any object
+    Collison
+    cmp scored ,1
+    jz MabrokKsabtPoint
+
+    cmp bullet_Row,95
+    jbe miss
+    Drawbullet bullet_col,bullet_Row,bulletsize,White
+    cmp ActionFlag,1
+    jz Run
+    ;dec di
+    jmp check
+miss:
+    mov ActionFlag,0
+    Drawbullet bullet_col,bullet_Row,bulletsize,black
+    mov bullet_Row,si
+    jmp khlasnaKhlas
+     
+MabrokKsabtPoint:
+
+    cmp curColor,0
+    jz incGreen
+    cmp curColor,1
+    jz inccyan
+    cmp curColor,2
+    jz incred
+    cmp curColor,3
+    jz incyellow
+    jmp doneYm3alm
+
+    incGreen:
+    inc gHit_value
+    Set1Dig gHit_value,gHit
+    SetCursor 20,13,0
+    PrintMessage gHit
+    cmp CurrUser,2
+    jz shofElTani1
+    add IntialPoints1,6
+    Set4Dig IntialPoints1,IP1
+    jmp doneYm3alm
+    shofElTani1:
+    add IntialPoints2,6
+    Set4Dig IntialPoints2,IP2
+    jmp doneYm3alm
+
+    incred:
+    inc rHit_value
+    Set1Dig rHit_value,rHit
+    SetCursor 20,16,0
+    PrintMessage rHit
+    cmp CurrUser,2
+    jz shofElTani2
+    add IntialPoints1,1
+    Set4Dig IntialPoints1,IP1
+    jmp doneYm3alm
+    shofElTani2:
+    add IntialPoints2,1
+    Set4Dig IntialPoints2,IP2
+    jmp doneYm3alm
+
+    inccyan:
+    inc cHit_value
+    Set1Dig cHit_value,cHit
+    SetCursor 20,18,0
+    PrintMessage cHit
+    cmp CurrUser,2
+    jz shofElTani3
+    add IntialPoints1,2
+    Set4Dig IntialPoints1,IP1
+    jmp doneYm3alm
+    shofElTani3:
+    add IntialPoints2,2
+    Set4Dig IntialPoints2,IP2
+    jmp doneYm3alm
+
+    incyellow:
+    inc yHit_value
+    Set1Dig yHit_value,yHit
+    SetCursor 20,21,0
+    PrintMessage yHit
+    cmp CurrUser,2
+    jz shofElTani4
+    add IntialPoints1,3
+    Set4Dig IntialPoints1,IP1
+    jmp doneYm3alm
+    shofElTani4:
+    add IntialPoints2,3
+    Set4Dig IntialPoints2,IP2
+
+    doneYm3alm:
+    call Refresh
+    mov ActionFlag,0
+    mov scored,0
+    Drawbullet bullet_col,bullet_Row,bulletsize,black
+    mov bullet_Row,si   
+
+khlasnaKhlas:
+    popa
+    ;---------------
+
+    dec di
+    jmp Check
+
+    EndGame:
+    ClearScreenGraphics 4,12,17,21,black
+    ClearScreenGraphics 22,12,35,21,black
+popa
+
+RET
+ENDP Game
+;-------Gun movement AKA 7ark el biw biw--------
+MoveGun Proc
+pusha
+    mov ActionFlag,0
+    mov ah,01h
+    int 16h
+    jz ExitGame
 
     GetKeyPressed
     mov move,al
@@ -1697,47 +1904,128 @@ DrawSpaceShip White
 
     cmp move ,' '
     je Hit
+    jmp ExitGame
 
 MoveUp:
-    cmp ssRow,128           ;upper limit
-    jz GameLoop
+    mov si,Gunx1
+    cmp ssRow,si          ;upper limit
+    jbe ExitGame
     DrawSpaceShip black
     Dec ssRow
+    cmp ssRow,si           
+    jbe ExitGame
     dec bullet_Row
     DrawSpaceShip White
-    jmp GameLoop
+    jmp ExitGame
 MoveDown:
-    cmp ssRow,168           ;lovwer limit
-    jz GameLoop
+    mov si,Gunx2
+    cmp ssRow,si           ;lovwer limit
+    jae ExitGame
     DrawSpaceShip black
     inc ssRow
+    cmp ssRow,si           
+    jae ExitGame
     inc bullet_Row
     DrawSpaceShip White
-    jmp GameLoop
+    jmp ExitGame
 MoveLeft:
-    cmp ssCol,32            ;left limit
-    jz GameLoop
+    mov si,GunY1
+    cmp ssCol,si            ;left limit
+    jbe ExitGame
     DrawSpaceShip black 
     Dec ssCol
+    cmp ssCol,si         
+    jbe ExitGame
     dec bullet_col
     DrawSpaceShip White
-    jmp GameLoop
+    jmp ExitGame
 MoveRight:
-    cmp ssCol,136           ;left limit
-    jz GameLoop
+    mov si,GunY2
+    cmp ssCol,si           ;left limit
+    jae ExitGame
     DrawSpaceShip black
     inc ssCol
+    cmp ssCol,si           
+    jae ExitGame
     inc bullet_col
     DrawSpaceShip White
-    jmp GameLoop
+    jmp ExitGame
 Hit:
-    BulletAction
-    jmp GameLoop
+    mov ActionFlag ,1
+    ;------------
+    jmp ExitGame
 
 ExitGame:
-    ret
-ENDP Game
+popa
+    RET 
+ENDP MoveGun 
+;------Move target "mal70za ghir el biw biw"------
+MoveObject Proc
+pusha
+    mov si,YBoundry
+    cmp objY,si
+    jae StartOver
+    Drawbullet objY,objX,objR,black
+    inc objY
+    cmp objY,si
+    jae StartOver
+    Drawbullet objY,objX,objR,objColor
+popa
+    RET
+    StartOver:
+    ;getting color
+    cmp Random ,0
+    Jz LGreen
+    cmp Random,1
+    jz LCyan
+    cmp Random ,2
+    Jz LRed
+    cmp Random,3
+    jz CYellow
+    jmp m3analon
 
+    LGreen:
+    mov objColor,LightGreen
+    mov curColor,0
+    jmp m3analon
+    LCyan:
+    mov objColor,LightCyan
+    mov curColor,1
+    jmp m3analon
+    LRed:
+    mov objColor,LightRed
+    mov curColor,2
+    jmp m3analon
+    CYellow:
+    mov objColor,Yellow
+    mov curColor,3
+
+    m3analon:
+    ;Getting random positions
+    mov al,Random
+    mov bl,4
+    mul bl
+    mov ah,0
+    add objX,ax 
+    cmp objX ,120
+    jae resetpos
+    jmp buf
+    resetpos:
+    mov objX,95
+    buf:
+    Drawbullet objY,objX,objR,black
+    cmp CurrUser,2
+    jz set2
+    mov cx, obj1Y
+    mov objY,cx
+    jmp tmam
+    Set2:
+    mov cx, obj2Y
+    mov objY,cx
+    tmam: ;ydonia hati kman hati
+popa
+    RET
+ENDP MoveObject
 
 ;-------MainScreen-------
 MainScreen proc near
@@ -1950,6 +2238,7 @@ WriteCommand proc
 
    ;call FlyingObj
 Ending_WriteCommand:
+    mov CurrUser,1 
     ret
 endp WriteCommand
 
@@ -2009,8 +2298,8 @@ pusha
     cmp OK,0
     je bayz
 
-    SetCursor 26,15,0
-    PrintMessage Operand1
+    ;SetCursor 26,15,0
+    ;PrintMessage Operand1
     ;SetCursor 26,13,0
     ;PrintMessage EndProg
     
@@ -2032,10 +2321,10 @@ pusha
     je bayz
     call TypeOp
 
-    SetCursor 26,17,0
-    PrintMessage Operand2
-    SetCursor 26,19,0
-    PrintMessage CurrUser
+    ;SetCursor 26,17,0
+    ;PrintMessage Operand2
+    ;SetCursor 26,19,0
+    ;PrintMessage CurrUser
 
     call Validate2Operands
     cmp OK,0
@@ -4335,16 +4624,18 @@ USER2_GAME_INFO:
     SetCursor User2Name+1,24,0
     PrintMessage Semicolon
 
-
-    ;call Game
-
-
     Call WriteCommand
+    call Game
+    mov CurrUser,2
+    call Game
+    mov CurrUser,1
+    
 
     cmp IntialPoints1,0
     je User2isWinner
     cmp IntialPoints2,0
     je User1isWinner
+
     jmp TheLoop
 
 User1isWinner:
@@ -4477,7 +4768,8 @@ Refresh proc
     PrintMessage User1Name+2
     SetCursor User1Name+1,0,0
     PrintMessage Semicolon
-    AsciiToNumber IP1,0,IntialPoints1
+    Set4Dig IntialPoints1,IP1
+    ;AsciiToNumber IP1,0,IntialPoints1
     PrintMessage IP1
 
     SetCursor 23,0,0
@@ -4488,7 +4780,8 @@ Refresh proc
     SetCursor al,0,0
     PrintMessage Semicolon
     popa
-    AsciiToNumber IP2,0,IntialPoints2
+    Set4Dig IntialPoints2,IP2
+    ;AsciiToNumber IP2,0,IntialPoints2
     PrintMessage IP2
     jmp Refresh_ending
 User1Wins:
@@ -4499,7 +4792,7 @@ User2Wins:
     jmp Refresh_ending
 
 Refresh_ending:
-     ret
+    ret
 Refresh endp   
 
 
