@@ -8,6 +8,44 @@ Debug macro charDebug
     PrintCharGraphics charDebug, White,1
 endm Debug
 
+;-------Copy the string unknown size-------
+CopyStringDollar macro string1,string2
+local myLoop, ending_compare_string
+pusha
+    mov si, 0
+    mov di, 0
+    myLoop:
+        mov al, string1[si]
+        cmp string1[si],'$'
+        je ending_compare_string
+        mov string2[di], al
+        inc si
+        inc di
+        dec cx
+        cmp cx, 0
+    jnz myLoop
+ending_compare_string:
+popa
+endm EmptyTheString
+
+;-------Copy the string-------
+CopyString macro string1,string2
+local myLoop
+pusha
+    mov si, 2
+    mov di, 0
+    mov cl,4
+    mov ch,0
+    myLoop:
+        mov al, string1[si]
+        mov string2[di], al
+        inc si
+        inc di
+        dec cx
+        cmp cx, 0
+    jnz myLoop
+popa
+endm EmptyTheString
 
 ;-------Empty the string-------
 EmptyTheString macro string2,size
@@ -426,9 +464,12 @@ looping:
     mov ah,0
     mov al,current[si-1]
     sub al,30h
+    cmp current[si-1],'A'
+    jb rest
+    sub al,7h
     cmp current[si-1],'a'
     jb rest
-    sub al,27h
+    sub al,20h
 rest:
     mul cx
     add bx,ax
@@ -508,9 +549,11 @@ endm NumbertoAscii2byte
 
 ;-------Read message-------
 ReadMessage MACRO msg
+pusha
     mov ah,0Ah
     lea dx,msg
     int 21h
+popa
 endm ReadMessage
 
 ;-------Read character-------
@@ -682,6 +725,8 @@ pusha
     getting_command:
     SetCursor UserCommandCol,UserCommandrow,0
     ReadMessage UserCommand
+    ;SetCursor 26,19,0
+    ;PrintMessage UserCommand
     UpperToLower UserCommand
     mov si,offset UserCommand+2
     mov al, Forbidden
@@ -1247,8 +1292,13 @@ Winner                  db 0
 User1                   db 'USER1$'
 User1Name               DB 12,?,12 DUP('$') , '$'
 realSize1               db ?
-IntialPoints1           dw ?
+IntialPoints1           dw ?,'$'
 IP1                     db '0000$'  ;IntialPoints1 as a message
+
+ForbidTemp              LABEL byte
+ForbidTempSize          db 2
+ForbidTempActSize       db ?
+Forbid1Data             db 2 DUP('$') ,'$'
 
 Forbidden1 LABEL byte
 Forbidden1Size          db 2
@@ -1274,6 +1324,20 @@ PressEnter              db 10,13,'Press ENTER to continue$'
 ForbiddenMSG            db 'Forbidden Character:',10,13, '$'  
 ForbiddenGameMSG        db 'Forbid-Press Key', '$'
 
+GameKeyScanCode         db ?,'$'
+GameKeyAscii            db ?,'$'
+PowerUpChosen           db ?,'$'
+PowerUpChosen2          db 3,?,2 DUP('$') ,'$'
+WrongPowerUpMSG         db 'Wrong Key.$'
+NoEnoughPtsMsg          db 'Wrong- press key','$'
+KeyPressPower           db 'F1 or F2.$'
+KeyPressChoose          db '1-2-3-4-5$'
+Power1Chosen            db 0
+Power2Chosen            db 0
+Power3Chosen            db 0
+Power4Chosen            db 0
+Power5Chosen            db 0
+
 ;-----------MainScreenVariables-----------
 Welcome                 db 'Welcome, Press any key to start', '$'
 GoodBye                 db 'GoodBye... ','$'
@@ -1294,7 +1358,7 @@ endcol                  db 20
 
 ;--------Winner Screen Variables--------
 WinnerScreenMSG1         db 3,14,2,' The winner is User 1 ',3,14,2,'$'
-WinnerScreenMSG2         db 3,14,2,' The winner is User 2 ',3,14,2,'$'
+WinnerScreenMSG2         db 3,14,2,' The winner is User 2 ',2,14,3,'$'
 WinnerVariable           db '105E$'
 
 ;--------Level Screen Variables---------
@@ -1374,6 +1438,8 @@ SI_Reg_Value2           db '0000', '$'
 DI_Reg_Value2           db '0000', '$'
 SP_Reg_Value2           db '0000', '$'
 BP_Reg_Value2           db '0000', '$'
+
+InputRegisterLevel2     db 5,?, 5 dup('$'), '$'
 
 CF1                     db 0
 CF2                     db 0
@@ -1468,11 +1534,13 @@ Op_to_Execute           db 8 dup('$')
 EmptyOp                 db 5 dup('$')
 OK                      db ?
 OperandLength           dw ?
-Operand1                db 7 dup('$')
+Operand1                db 7 dup('$'),'$'
+Operand1Size            dw ?,'$'
 Operand1Type            db 0, '$'
 Operand1Value           dw ?, '$'
 startOperand2           dw ?, '$'
 Operand2                db 7 dup('$')
+Operand2Size            dw ?,'$'
 Operand2Type            db 0, '$'
 Operand2Value           dw ?, '$'
 
@@ -1520,13 +1588,18 @@ UserCommand2Size        db 14
 UserCommand2ActualSize  db ?
 UserCommand2Data        db 14 dup('$') 
 
+UserComTemp LABEL byte
+UserComTempSize         db 14
+UserComTempActualSize   db ?
+UserComTempData         db 14 dup('$') 
+
 ;UserCommand2            db 14,?,14 dup('$')
 
 EmptyString12          db 12 dup('$')
 EmptyString6           db 6 dup('$')
 
 
-UserCommandSpaces       db 17 dup(' '),'$'
+UserCommandSpaces       db 19 dup(' '),'$'
 
 
 UserCommand1Col         db 0
@@ -1766,6 +1839,10 @@ MainScreen proc near
         PrintMessage f2Pressed
         mov IsF2pressed, 1
         call LevelScreen
+        cmp LevelVariable+2,'1'
+        je GoGame
+        call InputRegistersScreen
+GoGame:
         changeGraphicsmode
         call GameScreen
         jmp finishd
@@ -1809,6 +1886,142 @@ ending_levelscreen:
     popa
     RET
 endp LevelScreen
+
+
+;-------Input Registers Screen LV2-------
+InputRegistersScreen proc near
+    pusha
+    changeTextmode
+    ClearScreen WindowStart,WindowStart,WindowEndX,WindowEndY,0
+starting_user1:
+    SetCursor 15,0,0
+    PrintMessage User1
+
+    SetCursor 0,2,0
+    PrintMessage AX_Reg
+    SetCursor 5,2,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,AX_Reg_Value1
+    UpdateSmallReg AX_Reg_Value1,AH_Reg_Value1,AL_Reg_Value1
+    
+    ;SetCursor 5,2,0
+    ;PrintMessage InputRegisterLevel2
+    ;PrintMessage AX_Reg_Value1
+
+
+    SetCursor 0,4,0
+    PrintMessage BX_Reg
+    SetCursor 5,4,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,BX_Reg_Value1
+    UpdateSmallReg BX_Reg_Value1,BH_Reg_Value1,BL_Reg_Value1
+
+    SetCursor 0,6,0
+    PrintMessage CX_Reg
+    SetCursor 5,6,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,CX_Reg_Value1
+    UpdateSmallReg CX_Reg_Value1,CH_Reg_Value1,CL_Reg_Value1
+
+    SetCursor 0,8,0
+    PrintMessage DX_Reg
+    SetCursor 5,8,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,DX_Reg_Value1
+    UpdateSmallReg DX_Reg_Value1,DH_Reg_Value1,DL_Reg_Value1
+
+    SetCursor 0,10,0
+    PrintMessage SI_Reg
+    SetCursor 5,10,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,SI_Reg_Value1
+
+    SetCursor 0,12,0
+    PrintMessage DI_Reg
+    SetCursor 5,12,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,DI_Reg_Value1
+
+    SetCursor 0,14,0
+    PrintMessage BP_Reg
+    SetCursor 5,14,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,BP_Reg_Value1
+    
+    SetCursor 0,16,0
+    PrintMessage SP_Reg
+    SetCursor 5,16,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,SP_Reg_Value1
+    
+    SetCursor 0,18,0
+    call GetEnter
+
+    changeTextmode
+    ClearScreen WindowStart,WindowStart,WindowEndX,WindowEndY,0
+starting_user2:
+    SetCursor 15,0,0
+    PrintMessage User2
+    
+    SetCursor 0,2,0
+    PrintMessage AX_Reg
+    SetCursor 5,2,0
+    ReadMessage InputRegisterLevel2
+    ;CompareStrings InputRegisterLevel2+2,WinnerVariable,4,OK
+    CopyString InputRegisterLevel2,AX_Reg_Value2
+    UpdateSmallReg AX_Reg_Value2,AH_Reg_Value2,AL_Reg_Value2
+
+    SetCursor 0,4,0
+    PrintMessage BX_Reg
+    SetCursor 5,4,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,BX_Reg_Value2
+    UpdateSmallReg BX_Reg_Value2,BH_Reg_Value2,BL_Reg_Value2
+
+    SetCursor 0,6,0
+    PrintMessage CX_Reg
+    SetCursor 5,6,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,CX_Reg_Value2
+    UpdateSmallReg CX_Reg_Value2,CH_Reg_Value2,CL_Reg_Value2
+
+    SetCursor 0,8,0
+    PrintMessage DX_Reg
+    SetCursor 5,8,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,DX_Reg_Value2
+    UpdateSmallReg DX_Reg_Value2,DH_Reg_Value2,DL_Reg_Value2
+
+    SetCursor 0,10,0
+    PrintMessage SI_Reg
+    SetCursor 5,10,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,SI_Reg_Value2
+
+    SetCursor 0,12,0
+    PrintMessage DI_Reg
+    SetCursor 5,12,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,DI_Reg_Value2
+
+    SetCursor 0,14,0
+    PrintMessage BP_Reg
+    SetCursor 5,14,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,BP_Reg_Value2
+
+    SetCursor 0,16,0
+    PrintMessage SP_Reg
+    SetCursor 5,16,0
+    ReadMessage InputRegisterLevel2
+    CopyString InputRegisterLevel2,SP_Reg_Value2
+    
+    SetCursor 0,18,0
+    call GetEnter
+    popa
+    RET
+endp InputRegistersScreen
+
 
 ;-------Winner Screen-------
 WinnerScreen proc near
@@ -1923,30 +2136,269 @@ GetEnter ENDP
 
 ;-------Writing commands-------
 WriteCommand proc
+start1:
     mov CurrUser,1
-    ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
-    ;SetCursor UserCommand1Col,UserCommand1row,0
-    ;ReadMessage UserCommand1
-    ;UpperToLower UserCommand1
-    call excCommand
-    ;CLCWindow
-    ;check if command is valid -> change in the registers
+    ;Get Key for F1 or F2
+    ;F1 for command F2 for power-up
+    
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage KeyPressPower
+    GetKeyWait GameKeyScanCode,GameKeyAscii
 
-    ;if not valid -1 in points and take the other user command
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+
+    ;Check if PowerUp
+    cmp GameKeyScanCode,F1Scancode
+    je CallExecute
+    cmp GameKeyScanCode,F2Scancode
+    jne start1
+
+    ;Choose which power-up
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage KeyPressChoose
+    GetKeyWait PowerUpChosen,GameKeyAscii
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+
+    cmp PowerUpChosen,2 ;;scan-code for 1 on keyboard
+    je FirstPowerUp
+    cmp PowerUpChosen,3
+    je SecondPowerUp
+    cmp PowerUpChosen,4
+    je ThirdPowerUp
+    cmp PowerUpChosen,5
+    je FourthPowerUp
+    cmp PowerUpChosen,6
+    je FifthPowerUp
+    PrintMessage WrongPowerUpMSG
+    push ax
+    mov ah,0
+    int 16h
+    pop ax
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+    jmp CallExecute
+
+;Command on your own processor
+FirstPowerUp:
+    pusha
+    mov Power1Chosen,1
+    cmp IntialPoints1,5
+    jbe WrongPowerUp
+    sub IntialPoints1,5
+    Set4Dig IntialPoints1,IP1
+    mov CurrUser,2
+    ReadCommand UserCommand2,UserCommand1Col,UserCommand1row,Forbidden1Data
+    call excCommand
+    popa
+    jmp WriteCommandNow
+
+;Command on your processor and your opponent processor 
+SecondPowerUp:
+    cmp IntialPoints1,3
+    jbe WrongPowerUp
+    sub IntialPoints1,3
+    Set4Dig IntialPoints1,IP1
+    mov Power2Chosen,0
+    ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
+    CopyStringDollar UserCommand1,UserComTemp
+    mov Power2Chosen,1
+    call excCommand
+    CopyStringDollar UserComTemp,UserCommand2
+    mov CurrUser,2
+    call excCommand
+    jmp WriteCommandNow
+
+;Changing the forbidden character
+ThirdPowerUp:
+    mov Power3Chosen, 1
+    cmp IntialPoints1,8
+    jbe WrongPowerUp
+    sub IntialPoints1,8
+    CopyStringDollar Forbidden1,ForbidTemp
+    SetCursor UserCommand1Col,UserCommand1row,0
+    ReadMessage Forbidden1
+
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+
+    ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
+    call excCommand
+
+    CopyStringDollar ForbidTemp,Forbidden1
+
+    jmp WriteCommandNow
+
+;Data lines stuck
+FourthPowerUp:
+    cmp IntialPoints1,2
+    jbe WrongPowerUp
+    jmp WriteCommandNow
+
+;Clearing all registers
+FifthPowerUp:
+    cmp IntialPoints1,30h
+    jbe WrongPowerUp
+    jmp WriteCommandNow
+
+WrongPowerUp:
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage NoEnoughPtsMsg
+    push ax
+    mov ah,0
+    int 16h
+    pop ax
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+
+CallExecute:
+    ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
+    call excCommand
+WriteCommandNow:
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+    mov Power1Chosen,0
+    mov Power2Chosen,0
+    mov Power3Chosen,0
+    mov Power4Chosen,0
+    mov Power5Chosen,0
+
     cmp IntialPoints1,0
     je Ending_WriteCommand
     cmp IntialPoints2,0
     je Ending_WriteCommand
-    
-    SetCursor UserCommand1Col,UserCommand1row,0     2 commands
+
+start2:  
+    SetCursor UserCommand2Col,UserCommand2row,0     
     PrintMessage UserCommandSpaces
-    
+
+;Resetting power-up variables
+
     mov CurrUser,2
+
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage KeyPressPower
+    GetKeyWait GameKeyScanCode,GameKeyAscii
+
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+
+    ;Check if PowerUp
+    cmp GameKeyScanCode,F1Scancode
+    je CallExecute2
+    cmp GameKeyScanCode,F2Scancode
+    jne start2
+
+    ;Choose which power-up
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage KeyPressChoose
+    GetKeyWait PowerUpChosen,GameKeyAscii
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+
+    cmp PowerUpChosen,2
+    je FirstPowerUp2
+    cmp PowerUpChosen,3
+    je SecondPowerUp2
+    cmp PowerUpChosen,4
+    je ThirdPowerUp2
+    cmp PowerUpChosen,5
+    je FourthPowerUp2
+    cmp PowerUpChosen,6
+    je FifthPowerUp2
+    PrintMessage WrongPowerUpMSG
+    push ax
+    mov ah,0
+    int 16h
+    pop ax
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    jmp CallExecute2
+
+;Command on your own processor
+FirstPowerUp2:
+    pusha
+    mov Power1Chosen,1
+    cmp IntialPoints2,5
+    jbe WrongPowerUp2
+    sub IntialPoints2,5
+    Set4Dig IntialPoints2,IP2
+    mov CurrUser,1
+    ReadCommand UserCommand1,UserCommand2Col,UserCommand2row,Forbidden2Data
+    popa
+    jmp WriteCommandNow2
+
+;Command on your processor and your opponent processor 
+SecondPowerUp2:
+    cmp IntialPoints2,3
+    jbe WrongPowerUp
+    sub IntialPoints2,3
+    Set4Dig IntialPoints2,IP2
+    mov Power2Chosen,0
     ReadCommand UserCommand2,UserCommand2Col,UserCommand2row,Forbidden2Data
-    ;SetCursor UserCommand2Col,UserCommand2row,0
-    ;ReadMessage UserCommand2
-    ;UpperToLower UserCommand2
+    CopyStringDollar UserCommand2,UserComTemp
+    mov Power2Chosen,1
     call excCommand
+    CopyStringDollar UserComTemp,UserCommand1
+    mov CurrUser,1
+    call excCommand
+    jmp WriteCommandNow2
+
+;Changing the forbidden character
+ThirdPowerUp2:
+    mov Power3Chosen, 1
+    cmp IntialPoints2,8
+    jbe WrongPowerUp2
+    sub IntialPoints2,8
+    CopyStringDollar Forbidden2,ForbidTemp
+    SetCursor UserCommand2Col,UserCommand2row,0
+    ReadMessage Forbidden2
+
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+
+    ReadCommand UserCommand2,UserCommand2Col,UserCommand2row,Forbidden2Data
+    call excCommand
+
+    CopyStringDollar ForbidTemp,Forbidden2
+
+    jmp WriteCommandNow2
+
+;Data lines stuck
+FourthPowerUp2:
+    cmp IntialPoints2,2
+    jbe WrongPowerUp2
+    jmp WriteCommandNow2
+
+;Clearing all registers
+FifthPowerUp2:
+    cmp IntialPoints2,30h
+    jbe WrongPowerUp2
+    jmp WriteCommandNow2
+
+WrongPowerUp2:
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage NoEnoughPtsMsg
+    push ax
+    mov ah,0
+    int 16h
+    pop ax
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+
+CallExecute2:
+    ReadCommand UserCommand2,UserCommand2Col,UserCommand2row,Forbidden2Data
+    call excCommand
+WriteCommandNow2:
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+
+    mov Power1Chosen,0
+    mov Power2Chosen,0
+    mov Power3Chosen,0
+    mov Power4Chosen,0
+    mov Power5Chosen,0
 
    ;call FlyingObj
 Ending_WriteCommand:
@@ -1958,6 +2410,10 @@ excCommand proc
     
 pusha
     ;moving UserCommand into CurCommand
+    
+    ;SetCursor 23,17,0
+    ;PrintMessage IntialPoints1
+    
     cmp CurrUser,1
     je excCommand_User1
 
@@ -2032,10 +2488,10 @@ pusha
     je bayz
     call TypeOp
 
-    SetCursor 26,17,0
-    PrintMessage Operand2
-    SetCursor 26,19,0
-    PrintMessage CurrUser
+    ;SetCursor 26,17,0
+    ;PrintMessage Operand2
+    ;SetCursor 26,19,0
+    ;PrintMessage CurrUser
 
     call Validate2Operands
     cmp OK,0
@@ -2520,16 +2976,29 @@ div_loop:
 bayz:  
     SetCursor 17,23,0
     PrintMessage ChatStatusMSG1
-
     cmp CurrUser,2
     je bayz_user2
+    cmp Power1Chosen,1
+    jne User1true
+    dec IntialPoints2
+    Set4Dig IntialPoints2,IP2
+    jmp msh_bayz
+User1true:
     dec IntialPoints1
-    NumbertoAscii4byte IntialPoints1,IP1
+    Set4Dig IntialPoints1,IP1
     jmp msh_bayz
 
 bayz_user2:
+    cmp Power2Chosen, 1
+    je msh_bayz
+    cmp Power1Chosen, 1
+    jne User2true
+    dec IntialPoints1
+    Set4Dig IntialPoints1,IP1
+    jmp msh_bayz
+User2true:
     dec IntialPoints2
-    NumbertoAscii4byte IntialPoints2,IP2
+    Set4Dig IntialPoints2,IP2
 
 msh_bayz:
 EmptyTheString UserCommand1Data,12
@@ -2730,8 +3199,10 @@ ValidateOp1 proc
       ;compare Curr_Command with command at loop_index
       mov OK,0
       mov bx,0
-
+      GetStringSize Operand1,Operand1Size
 compare_registers:
+      cmp Operand1Size,2
+      jne compare_based
       lea si,AX_op[bx]
       lea di,Operand1
       mov cx,3
@@ -2744,6 +3215,8 @@ compare_registers:
       jmp compare_registers
 
 compare_based:  
+      cmp Operand1Size,4
+      jne compare_memory
       lea si,AX_op[bx]
       lea di,Operand1
       mov cx,4
@@ -2756,6 +3229,8 @@ compare_based:
       jmp compare_based
 
 compare_memory:
+      cmp Operand1Size,3
+      jne not_found_op1
       lea si,AX_op[bx]
       lea di,Operand1
       mov cx,3
@@ -4126,12 +4601,19 @@ finished_LoadOperandValueUser2:
 endp LoadOperandValueUser2
 
 ;-------Game Screen-------
+;Key pressed if F1 -> write command directly
+;Key pressed if F2 -> choose power-up first
 GameScreen proc
 
+cmp LevelVariable+2,'2'
+je set_start
 ZeroALL 0
+set_start:
 Set4Dig IntialPoints1,IP1
 Set4Dig IntialPoints2,IP2
+
 TheLoop:
+
     DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+9,0,Purple
     DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+78,0,Purple
     DrawLineGraphics WindowGStart,WindowGEndY,WindowGStart+92,0,Purple
@@ -4304,7 +4786,7 @@ TheLoop:
     PrintMessage User1Name+2
     SetCursor User1Name+1,0,0
     PrintMessage Semicolon
-    AsciiToNumber IP1,0,IntialPoints1
+    Set4Dig IntialPoints1,IP1
     PrintMessage IP1
 
 
@@ -4316,7 +4798,8 @@ TheLoop:
     SetCursor al,0,0
     PrintMessage Semicolon
     popa
-    AsciiToNumber IP2,0,IntialPoints2
+    ;AsciiToNumber IP2,0,IntialPoints2
+    Set4Dig IntialPoints2,IP2
     PrintMessage IP2
     cmp LevelVariable+2,'2'
     je USER2_GAME_INFO
@@ -4338,9 +4821,7 @@ USER2_GAME_INFO:
 
     ;call Game
 
-
     Call WriteCommand
-
     cmp IntialPoints1,0
     je User2isWinner
     cmp IntialPoints2,0
@@ -4477,7 +4958,8 @@ Refresh proc
     PrintMessage User1Name+2
     SetCursor User1Name+1,0,0
     PrintMessage Semicolon
-    AsciiToNumber IP1,0,IntialPoints1
+    ;AsciiToNumber IP1,0,IntialPoints1
+    Set4Dig IntialPoints1,IP1
     PrintMessage IP1
 
     SetCursor 23,0,0
@@ -4488,7 +4970,8 @@ Refresh proc
     SetCursor al,0,0
     PrintMessage Semicolon
     popa
-    AsciiToNumber IP2,0,IntialPoints2
+    ;AsciiToNumber IP2,0,IntialPoints2
+    Set4Dig IntialPoints2,IP2
     PrintMessage IP2
     jmp Refresh_ending
 User1Wins:
