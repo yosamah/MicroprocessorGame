@@ -1592,7 +1592,7 @@ DS03_Value2             db '00', '$'
 DS04_Value2             db '00', '$'
 
 ZerosMSG                db '0000', '$'
-
+TemporaryCheckMem       dw ?,'$'
 ;Geting username variables 
 MulNmber                db 10
 messageinvalidcharacter DB 'Invalid Input',10,13, '$'
@@ -1658,7 +1658,7 @@ pushCommand             db 'push$'
 found_cmd               db 0
 Op_to_Execute           db 8 dup('$')
 EmptyOp                 db 5 dup('$')
-OK                      db ?
+OK                      db ?,'$'
 OperandLength           dw ?
 Operand1                db 7 dup('$'),'$'
 Operand1Size            dw ?,'$'
@@ -3090,10 +3090,6 @@ pusha
     cmp OK,1
     je or_loop
 
-    ; if third is not space, cmd is wrong
-    mov dl, 3
-    cmp CurCommand+3,' '
-    jne bayz
 
     ;Commands with no operands
     CompareStrings Op_to_Execute,clcCommand,4,OK
@@ -3104,14 +3100,22 @@ pusha
     cmp OK,1
     je nop_loop
 
+    ; if third is not space, cmd is wrong
+    mov dl, 3
+    cmp CurCommand+3,' '
+    jne bayz
+
     ;Validaate operand 1
     call GetOperandOne
+
+    SetCursor 26,15,0
+    PrintMessage Operand1
+
     call ValidateOp1
+    
     cmp OK,0
     je bayz
 
-    ;SetCursor 26,15,0
-    ;PrintMessage Operand1
     ;SetCursor 26,13,0
     ;PrintMessage EndProg
     
@@ -3197,6 +3201,7 @@ pusha
     je rcr_loop
 
 inc_loop:
+    call TypeOp
     call GetOperandTwo
     isEmptyString Operand2,OK
     cmp OK,0
@@ -3207,10 +3212,13 @@ inc_loop:
     inc ax
     mov Operand1Value,ax
     popa
+    SetCursor 10,10,0
+    PrintMessage Operand1Value
     call LoadOperandValueUser1
     jmp msh_bayz
 
 dec_loop:
+    call TypeOp
     call GetOperandTwo
     isEmptyString Operand2,OK
     cmp OK,0
@@ -3299,6 +3307,16 @@ start_shr_loop:
     jmp msh_bayz
 
 clc_loop: 
+    call TypeOp
+    cmp Operand1Type,0
+    jne bayz
+    cmp Operand2Type,0
+    jne bayz
+    cmp CurrUser,1
+    jne user_two_clc
+    mov CF1,0
+    jmp msh_bayz
+user_two_clc:  
     mov CF2,0
     jmp msh_bayz
 
@@ -3448,6 +3466,7 @@ start_rcr_loop:
     jmp msh_bayz
 
 nop_loop:
+    call TypeOp
     cmp Operand1Type,0
     jne bayz
     cmp Operand2Type,0
@@ -3853,9 +3872,11 @@ ValidateOp1 proc
       mov OK,0
       mov bx,0
       GetStringSize Operand1,Operand1Size
+
+
 compare_registers:
-      cmp Operand1Size,2
-      jne compare_based
+      ;cmp Operand1Size,2
+      ;jne compare_based
       lea si,AX_op[bx]
       lea di,Operand1
       mov cx,3
@@ -3868,8 +3889,8 @@ compare_registers:
       jmp compare_registers
 
 compare_based:  
-      cmp Operand1Size,4
-      jne compare_memory
+      ;cmp Operand1Size,4
+      ;jne compare_memory
       lea si,AX_op[bx]
       lea di,Operand1
       mov cx,4
@@ -3882,8 +3903,8 @@ compare_based:
       jmp compare_based
 
 compare_memory:
-      cmp Operand1Size,3
-      jne not_found_op1
+      ;cmp Operand1Size,3
+      ;jne not_found_op1
       lea si,AX_op[bx]
       lea di,Operand1
       mov cx,3
@@ -3898,11 +3919,12 @@ compare_memory:
  found_op1:    
       mov OK,1
       jmp finished_op1    
-
+    
  not_found_op1:
      mov OK,0   
-     
+
 finished_op1:
+
     popa
     ret
 endp ValidateOp1
@@ -4142,7 +4164,7 @@ TypeOp proc
     jmp mem_op1
 
     ;check immediate
-     CheckImmediateLabel:
+    CheckImmediateLabel:
     CheckImmediate Operand1, OK
     cmp OK,0
     je false_op1
@@ -4318,6 +4340,16 @@ endp TypeOp
 GetOperandValueUser1 proc
 
 pusha
+        CompareStrings Operand2,BX_op_idx,5,OK
+    cmp OK,1
+    je BXidxisOP1
+    CompareStrings Operand2,SI_op_idx,5,OK
+    cmp OK,1
+    je SIidxisOP1
+    CompareStrings Operand2,DI_op_idx,5,OK
+    cmp OK,1
+    je DIidxisOP1
+    
     cmp Operand2Type,4
     je OP2IMM
     cmp Operand2Type,5
@@ -4374,15 +4406,7 @@ pusha
     CompareStrings Operand2,BP_op,3,OK
     cmp OK,1
     je BPisOP1
-    CompareStrings Operand2,BX_op_idx,5,OK
-    cmp OK,1
-    je BXidxisOP1
-    CompareStrings Operand2,SI_op_idx,5,OK
-    cmp OK,1
-    je SIidxisOP1
-    CompareStrings Operand2,DI_op_idx,5,OK
-    cmp OK,1
-    je DIidxisOP1
+
  
  AXisOP1:
  cmp CurrUser,2
@@ -4501,13 +4525,109 @@ user1_bp:
        jmp finished_GetOperandValueUser1 
 
 BXidxisOP1:
+    cmp CurrUser,2
+       je user2_bxidx2
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser1
+user2_bxidx2:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        ;mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser1
+
 SIidxisOP1:
+ cmp CurrUser,2
+       je user2_siidx2
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser1
+user2_siidx2:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        ;mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser1
+
 DIidxisOP1:
+cmp CurrUser,2
+       je user2_diidx2
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser1
+user2_diidx2:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        ;mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser1
+
 
 OP2Imm:
     AsciiToNumber Operand2,0,Operand2Value
     jmp finished_GetOperandValueUser1 
-    
+
+Set_Mem_Type2:
+    pusha
+    mov ax,TemporaryCheckMem
+    mov Operand1TypeInMemory,al
+    popa
+
 OP2MEM:
     cmp Operand2TypeInMemory, 0
     jne memo2
@@ -4586,6 +4706,15 @@ endp GetOperandValueUser1
 GetOperandValueUser2 proc
 
     pusha
+    CompareStrings Operand1,BX_op_idx,4,OK
+    cmp OK,1
+    je BXidxisOP2
+    CompareStrings Operand1,SI_op_idx,4,OK
+    cmp OK,1
+    je SIidxisOP2
+    CompareStrings Operand1,DI_op_idx,4,OK
+    cmp OK,1
+    je DIidxisOP2
 
     cmp Operand1Type,3
     je OP1MEM
@@ -4638,16 +4767,8 @@ GetOperandValueUser2 proc
     CompareStrings Operand1,BP_op,3,OK
     cmp OK,1
     je BPisOP2
-    CompareStrings Operand1,BX_op_idx,5,OK
-    cmp OK,1
-    je BXidxisOP2
-    CompareStrings Operand1,SI_op_idx,5,OK
-    cmp OK,1
-    je SIidxisOP2
-    CompareStrings Operand1,DI_op_idx,5,OK
-    cmp OK,1
-    je DIidxisOP2
- 
+    
+
  AXisOP2:
  cmp CurrUser,2
  je user2_ax      
@@ -4794,9 +4915,104 @@ user2_bp:
        jmp finished_GetOperandValueUser2 
 
 BXidxisOP2:
-SIidxisOP2:
-DIidxisOP2:
+       cmp CurrUser,2
+       je user2_bxidx
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxidx:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        ;mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
 
+SIidxisOP2:
+cmp CurrUser,2
+       je user2_siidx
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_siidx:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        ;mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIidxisOP2:
+cmp CurrUser,2
+       je user2_diidx
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_diidx:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        ;mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+
+Set_Mem_Type:
+    pusha
+    mov ax,TemporaryCheckMem
+    mov Operand1TypeInMemory,al
+    popa
 OP1MEM:
     cmp Operand1TypeInMemory, 0
     jne memo22
@@ -4861,6 +5077,7 @@ OP1MEM:
 
     
 finished_GetOperandValueUser2:
+    ;mov TemporaryCheckMem,7
     popa
     ret
 endp GetOperandValueUser2
@@ -4870,6 +5087,16 @@ endp GetOperandValueUser2
 LoadOperandValueUser1 proc
 
     pusha
+    CompareStrings Operand1,BX_op_idx,4,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,SI_op_idx,4,OK
+    cmp OK,1
+    je SIidxisLoad
+    CompareStrings Operand1,DI_op_idx,4,OK
+    cmp OK,1
+    je DIidxisLoad
+    
     cmp Operand1Type,3
     je Load_OP1MEM
 
@@ -4921,16 +5148,8 @@ LoadOperandValueUser1 proc
     CompareStrings Operand1,BP_op,3,OK
     cmp OK,1
     je BPisLoad
-    CompareStrings Operand1,BX_op_idx,5,OK
-    cmp OK,1
-    je BXidxisLoad
-    CompareStrings Operand1,SI_op_idx,5,OK
-    cmp OK,1
-    je SIidxisLoad
-    CompareStrings Operand1,DI_op_idx,5,OK
-    cmp OK,1
-    je DIidxisLoad
     jmp finished_LoadOperandValueUser
+
  AXisLoad:
  cmp CurrUser,2 
  je axlod_2  
@@ -5100,8 +5319,17 @@ bplod_2:
        jmp finished_LoadOperandValueUser
 
  BXidxisLoad:
+    cmp TemporaryCheckMem,4
+    ja finished_LoadOperandValueUser
+    jmp Load_OP1MEM
  SIidxisLoad:
+    cmp TemporaryCheckMem,4
+    ja finished_LoadOperandValueUser
+    jmp Load_OP1MEM
  DIidxisLoad:
+    cmp TemporaryCheckMem,4
+    ja finished_LoadOperandValueUser
+    jmp Load_OP1MEM
 
  Load_OP1MEM:
     cmp Operand1TypeInMemory, 0
