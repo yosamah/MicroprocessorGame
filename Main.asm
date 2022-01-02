@@ -144,6 +144,82 @@ user_2_zeroing:
     popa
 endm ZeroALL
 
+;---------Check Data Bus Stuck----------
+CheckDataBus Macro CurrOperandCheckStuck
+LOCAL stuck_at_zero,check_type_zero,stuck_zero_big,stuck_at_one,check_type_one,stuck_one_big,ending_checkdatabus
+pusha
+    cmp Power4Chosen,1
+    jne ending_checkdatabus
+    cmp StuckValue,'0'
+    jne stuck_at_one
+
+stuck_at_zero:
+    cmp DataLineValue,8
+    jae check_type_zero
+    mov bx,0
+    mov dx,1
+    mov cl,DataLineValue
+    mov ch,0
+    shl dx,cl
+    or  bx,dx
+    not bx
+    and CurrOperandCheckStuck,bx
+    jmp ending_checkdatabus
+
+check_type_zero:
+    cmp Operand2Type,2
+    je stuck_zero_big
+    cmp Operand2Type,5
+    je stuck_zero_big
+    jmp ending_checkdatabus
+
+stuck_zero_big:
+    mov bx,0
+    mov dx,1
+    mov cl,DataLineValue
+    mov ch,0
+    shl dx,cl
+    or bx,dx
+    not bx
+    and CurrOperandCheckStuck,bx
+    jmp ending_checkdatabus
+
+stuck_at_one:
+    cmp DataLineValue,8
+    jae check_type_one
+    mov bx,0
+    mov dx,1
+    mov cl,DataLineValue
+    mov ch,0
+    shl dx,cl
+    or bx,dx
+    or CurrOperandCheckStuck,bx
+    jmp ending_checkdatabus
+
+check_type_one:
+    cmp Operand2Type,2
+    je stuck_one_big
+    cmp Operand2Type,5
+    je stuck_one_big
+    jmp ending_checkdatabus
+
+stuck_one_big:
+    mov bx,0
+    mov dx,1
+    mov cl,DataLineValue
+    mov ch,0
+    shl dx,cl
+    or bx,dx
+    not bx
+    or bx,cx
+    or CurrOperandCheckStuck,bx
+    jmp ending_checkdatabus
+
+ending_checkdatabus:
+    mov Power4Chosen,0
+popa
+endm CheckDataBus
+
 ;-------Changing to graphics mode-------
 changeGraphicsmode Macro
 
@@ -913,6 +989,28 @@ pusha
 popa
 endm UpperToLower
 
+;--------Upper to lower case----------
+LowertoUpperSize Macro InputString,size
+    Local loop1,loop2
+pusha
+    mov cx, size
+    mov bx, 0
+    loop1:
+    mov al, InputString[bx]
+    cmp al , 'a'
+    ja  loop2
+    cmp al , 'z'
+    jb loop2
+    sub al , 20h
+
+    loop2: 
+
+    mov InputString[bx] , al 
+    inc bx
+    loop loop1
+
+popa
+endm UpperToLower
 
 ;--------Set 4 Digits----------
 Set4Dig Macro IntialPoints,IntialPoints_Meg
@@ -1330,15 +1428,38 @@ GameKeyScanCode         db ?,'$'
 GameKeyAscii            db ?,'$'
 PowerUpChosen           db ?,'$'
 PowerUpChosen2          db 3,?,2 DUP('$') ,'$'
+
 WrongPowerUpMSG         db 'Wrong Key.$'
 NoEnoughPtsMsg          db 'Wrong- press key','$'
 KeyPressPower           db 'F1 or F2.$'
 KeyPressChoose          db '1-2-3-4-5$'
+Power4StuckMSG          db 'Stuck 0 - 1$','$'
+Power4DataMSG           db 'Data 0 - F$','$'
+PowerUsedMSG           db 'Used already$','$'
+Power5User1             db 0
+Power5User2             db 0
+Power1User1LV2          db 0 
+Power1User2LV2          db 0 
+EnterTarget             db 'Enter target $'
+ValueExists             db 'Value is in Reg$'
+NewTargetValue          db 5,?,5 DUP('$') ,'$'
+TargetValid             db 0
+
 Power1Chosen            db 0
 Power2Chosen            db 0
 Power3Chosen            db 0
 Power4Chosen            db 0
 Power5Chosen            db 0
+
+Stuck LABEL byte
+StuckSize               db 2
+StuckActualSize         db ?
+StuckValue              db 2 DUP('$') ,'$'
+
+DataLine LABEL byte
+DataLineSize            db 2
+DataLineActualSize      db ?
+DataLineValue           db 2 DUP('$') ,'$'
 
 ;-----------MainScreenVariables-----------
 Welcome                 db 'Welcome, Press any key to start', '$'
@@ -1359,7 +1480,7 @@ startcol                db 0
 endcol                  db 20
 
 ;--------Winner Screen Variables--------
-WinnerScreenMSG1         db 3,14,2,' The winner is User 1 ',3,14,2,'$'
+WinnerScreenMSG1         db 3,14,2,' The winner is User 1 ',2,14,3,'$'
 WinnerScreenMSG2         db 3,14,2,' The winner is User 2 ',2,14,3,'$'
 WinnerVariable           db '105E$'
 
@@ -1367,6 +1488,9 @@ WinnerVariable           db '105E$'
 LevelInputMSG           db 'Enter Level',10,13, '$'
 LevelVariable           db 3,?,2 DUP('$') ,'$'
 LevelundefinedMsg       db 'Level should be 1 or 2 $'
+ChooseProc              db 'Choose Processor$'
+Processor1or2           db '1 - 2$'
+ProcessorChosen         db 3,?,2 DUP('$') ,'$'
 
 ;-----------Circle variables-----------
 XC                      dw 50
@@ -1545,6 +1669,7 @@ Operand2                db 7 dup('$')
 Operand2Size            dw ?,'$'
 Operand2Type            db 0, '$'
 Operand2Value           dw ?, '$'
+CurrOperandCheckStuck   dw ?,'$'
 
 Operand1TypeInMemory    db ?, '$'
 Operand2TypeInMemory    db ?, '$'
@@ -2129,7 +2254,7 @@ MainScreen proc near
         call LevelScreen
         cmp LevelVariable+2,'1'
         je GoGame
-        call InputRegistersScreen
+        ;call InputRegistersScreen
 GoGame:
         changeGraphicsmode
         call GameScreen
@@ -2424,8 +2549,10 @@ GetEnter ENDP
 
 ;-------Writing commands-------
 WriteCommand proc
+
 start1:
     mov CurrUser,1
+
     ;Get Key for F1 or F2
     ;F1 for command F2 for power-up
     
@@ -2449,6 +2576,7 @@ start1:
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
 
+
     cmp PowerUpChosen,2 ;;scan-code for 1 on keyboard
     je FirstPowerUp
     cmp PowerUpChosen,3
@@ -2459,31 +2587,73 @@ start1:
     je FourthPowerUp
     cmp PowerUpChosen,6
     je FifthPowerUp
+    SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage WrongPowerUpMSG
+
     push ax
     mov ah,0
     int 16h
     pop ax
+
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
     jmp CallExecute
 
 ;Command on your own processor
 FirstPowerUp:
-    pusha
-    mov Power1Chosen,1
+    cmp LevelVariable+2,'1'
+    je FirstPowerUpLevel1
+    cmp Power1User1LV2,1
+    jne FirstPowerUpLevel2
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage PowerUsedMSG
+    GetKeyWait ScanCode,ScanCode
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+    jmp CallExecute
+
+FirstPowerUpLevel2:
+    cmp IntialPoints1,30
+    jbe WrongPowerUp
+    mov Power1User1LV2,1
+    Set4Dig IntialPoints1,IP1
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage EnterTarget
+    ReadMessage NewTargetValue
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+    call ValidateTarget
+    cmp TargetValid,1
+    je change_target
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage ValueExists
+    GetKeyWait ScanCode,ScanCode
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    jmp CallExecute
+change_target:
+    sub IntialPoints1,30
+    LowertoUpperSize NewTargetValue,4
+    CopyString NewTargetValue,WinnerVariable
+    jmp CallExecute
+FirstPowerUpLevel1:
     cmp IntialPoints1,5
     jbe WrongPowerUp
     sub IntialPoints1,5
     Set4Dig IntialPoints1,IP1
+
+ChooseProcessorLevel2User1:    
+    mov Power1Chosen,1
     mov CurrUser,2
     ReadCommand UserCommand2,UserCommand1Col,UserCommand1row,Forbidden1Data
     call excCommand
-    popa
-    jmp WriteCommandNow
+
+jmp Resetting1
+
 
 ;Command on your processor and your opponent processor 
 SecondPowerUp:
+
     cmp IntialPoints1,3
     jbe WrongPowerUp
     sub IntialPoints1,3
@@ -2496,72 +2666,147 @@ SecondPowerUp:
     CopyStringDollar UserComTemp,UserCommand2
     mov CurrUser,2
     call excCommand
-    jmp WriteCommandNow
+
+jmp Resetting1
+
 
 ;Changing the forbidden character
 ThirdPowerUp:
+
     mov Power3Chosen, 1
     cmp IntialPoints1,8
     jbe WrongPowerUp
     sub IntialPoints1,8
+    Set4Dig IntialPoints1,IP1
     CopyStringDollar Forbidden1,ForbidTemp
     SetCursor UserCommand1Col,UserCommand1row,0
     ReadMessage Forbidden1
-
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
-
     ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
     call excCommand
-
     CopyStringDollar ForbidTemp,Forbidden1
 
-    jmp WriteCommandNow
+jmp Resetting1
+
 
 ;Data lines stuck
 FourthPowerUp:
+
     cmp IntialPoints1,2
     jbe WrongPowerUp
-    jmp WriteCommandNow
+    sub IntialPoints1,2
+    Set4Dig IntialPoints1,IP1
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage Power4StuckMSG
+    ReadMessage Stuck
+
+    cmp StuckValue,'0'
+    je check_dataline
+    cmp StuckValue,'1'
+    je check_dataline
+    jmp WrongPowerUp
+
+check_dataline:
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage Power4DataMSG
+    ReadMessage DataLine
+    cmp DataLineValue,'0'
+    jb WrongPowerUp
+    cmp DataLineValue,'9'
+    ja check_letter
+    sub DataLineValue,30h
+    jmp start_execute_power4
+
+check_letter:
+    cmp DataLineValue,'A'
+    jb WrongPowerUp
+    cmp DataLineValue,'F'
+    ja WrongPowerUp
+    sub DataLineValue, 37h
+
+start_execute_power4:
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+    ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
+    call excCommand
+    mov Power4Chosen, 1
+ 
+jmp Resetting1
+
 
 ;Clearing all registers
 FifthPowerUp:
-    cmp IntialPoints1,30h
+    cmp Power5User1,1
+    jne start_power5
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage PowerUsedMSG
+    GetKeyWait ScanCode,ScanCode
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    jmp CallExecute
+start_power5:
+    mov Power5Chosen, 1
+    cmp IntialPoints1,30
     jbe WrongPowerUp
-    jmp WriteCommandNow
+    sub IntialPoints1,30
+    mov Power5User1,1
+    ZeroALL 1
+    call Refresh
+jmp Resetting1
+
 
 WrongPowerUp:
+    
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage NoEnoughPtsMsg
+    
     push ax
     mov ah,0
     int 16h
     pop ax
+
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
 
 CallExecute:
-    ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
-    call excCommand
-WriteCommandNow:
+    cmp LevelVariable+2,'2'
+    jne start_execute
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage ChooseProc
+    ReadMessage ProcessorChosen
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
+    cmp ProcessorChosen+2,'1'
+    je ChooseProcessorLevel2User1
+start_execute:   
+    ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
+    call excCommand
+Resetting1:
+    
+    SetCursor UserCommand1Col,UserCommand1row,0
+    PrintMessage UserCommandSpaces
+
+    ;Resetting power-up variables
     mov Power1Chosen,0
     mov Power2Chosen,0
     mov Power3Chosen,0
-    mov Power4Chosen,0
+    ;mov Power4Chosen,0
     mov Power5Chosen,0
 
+    ;Check if there's a winner
     cmp IntialPoints1,0
     je Ending_WriteCommand
     cmp IntialPoints2,0
     je Ending_WriteCommand
 
 start2:  
-    SetCursor UserCommand2Col,UserCommand2row,0     
+    SetCursor UserCommand1Col,UserCommand1row,0     
     PrintMessage UserCommandSpaces
 
-;Resetting power-up variables
+    call Refresh
 
     mov CurrUser,2
 
@@ -2606,19 +2851,59 @@ start2:
 
 ;Command on your own processor
 FirstPowerUp2:
-    pusha
-    mov Power1Chosen,1
+    cmp LevelVariable+2,'1'
+    je FirstPowerUpLevel1_2
+    cmp Power1User2LV2,1
+    jne FirstPowerUpLevel2_2
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage PowerUsedMSG
+    GetKeyWait ScanCode,ScanCode
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    jmp CallExecute
+
+FirstPowerUpLevel2_2:
+    cmp IntialPoints2,30
+    jbe WrongPowerUp2
+    mov Power1User2LV2,1
+    Set4Dig IntialPoints2,IP2
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage EnterTarget
+    ReadMessage NewTargetValue
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    call ValidateTarget
+    cmp TargetValid,1
+    je change_target2
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage ValueExists
+    GetKeyWait ScanCode,ScanCode
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    jmp CallExecute2
+change_target2:
+    sub IntialPoints2,30
+    CopyString NewTargetValue+2,WinnerVariable
+    GetKeyWait ScanCode,ScanCode
+    jmp CallExecute2
+
+FirstPowerUpLevel1_2:
     cmp IntialPoints2,5
     jbe WrongPowerUp2
     sub IntialPoints2,5
     Set4Dig IntialPoints2,IP2
+
+ChooseProcessorLevel2User2:
+    mov Power1Chosen,1
     mov CurrUser,1
     ReadCommand UserCommand1,UserCommand2Col,UserCommand2row,Forbidden2Data
-    popa
-    jmp WriteCommandNow2
+    call excCommand
+
+jmp WriteCommandNow2
 
 ;Command on your processor and your opponent processor 
 SecondPowerUp2:
+
     cmp IntialPoints2,3
     jbe WrongPowerUp
     sub IntialPoints2,3
@@ -2631,10 +2916,12 @@ SecondPowerUp2:
     CopyStringDollar UserComTemp,UserCommand1
     mov CurrUser,1
     call excCommand
-    jmp WriteCommandNow2
+jmp WriteCommandNow2
+
 
 ;Changing the forbidden character
 ThirdPowerUp2:
+
     mov Power3Chosen, 1
     cmp IntialPoints2,8
     jbe WrongPowerUp2
@@ -2651,19 +2938,75 @@ ThirdPowerUp2:
 
     CopyStringDollar ForbidTemp,Forbidden2
 
-    jmp WriteCommandNow2
+jmp WriteCommandNow2
 
 ;Data lines stuck
 FourthPowerUp2:
+
     cmp IntialPoints2,2
     jbe WrongPowerUp2
-    jmp WriteCommandNow2
+    sub IntialPoints2,2
+    Set4Dig IntialPoints2,IP2
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage Power4StuckMSG
+    ReadMessage Stuck
+
+    cmp StuckValue,'0'
+    je check_dataline_2
+    cmp StuckValue,'1'
+    je check_dataline_2
+    jmp WrongPowerUp2
+
+check_dataline_2:
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage Power4DataMSG
+    ReadMessage DataLine
+    cmp DataLineValue,'0'
+    jb WrongPowerUp2
+    cmp DataLineValue,'9'
+    ja check_letter_2
+    sub DataLineValue,30h
+    jmp start_execute_power4_2
+
+check_letter_2:
+    cmp DataLineValue,'A'
+    jb WrongPowerUp2
+    cmp DataLineValue,'F'
+    ja WrongPowerUp2
+    sub DataLineValue, 37h
+
+start_execute_power4_2:
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    ReadCommand UserCommand2,UserCommand2Col,UserCommand2row,Forbidden2Data
+    call excCommand
+    mov Power4Chosen, 1
+
+jmp WriteCommandNow2
 
 ;Clearing all registers
 FifthPowerUp2:
-    cmp IntialPoints2,30h
-    jbe WrongPowerUp2
-    jmp WriteCommandNow2
+
+    cmp Power5User2,1
+    jne start_power5_2
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage PowerUsedMSG
+    GetKeyWait ScanCode,ScanCode
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+
+    jmp CallExecute2
+start_power5_2:
+    mov Power5Chosen, 1
+    cmp IntialPoints2,30
+    jbe WrongPowerUp
+    sub IntialPoints2,30
+    mov Power5User2,1
+    ZeroALL 2
+    call Refresh
+jmp WriteCommandNow2
 
 WrongPowerUp2:
     SetCursor UserCommand2Col,UserCommand2row,0
@@ -2676,22 +3019,35 @@ WrongPowerUp2:
     PrintMessage UserCommandSpaces
 
 CallExecute2:
+    cmp LevelVariable+2,'2'
+    jne start_execute2
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage ChooseProc
+    ReadMessage ProcessorChosen
+    SetCursor UserCommand2Col,UserCommand2row,0
+    PrintMessage UserCommandSpaces
+    cmp ProcessorChosen+2,'2'
+    je ChooseProcessorLevel2User2
+start_execute2:
     ReadCommand UserCommand2,UserCommand2Col,UserCommand2row,Forbidden2Data
     call excCommand
+
 WriteCommandNow2:
     SetCursor UserCommand2Col,UserCommand2row,0
     PrintMessage UserCommandSpaces
 
+Resetting2:
     mov Power1Chosen,0
     mov Power2Chosen,0
     mov Power3Chosen,0
-    mov Power4Chosen,0
+    ;mov Power4Chosen,0
     mov Power5Chosen,0
 
    ;call FlyingObj
 Ending_WriteCommand:
-    mov CurrUser,1 
-    ret
+    mov CurrUser,1
+    call Refresh 
+ret
 endp WriteCommand
 
 ;-------Execute Command-------
@@ -3108,6 +3464,15 @@ add_loop:
     pusha
     mov ax,Operand1Value
     mov bx,Operand2Value
+    mov CurrOperandCheckStuck,bx
+    CheckDataBus  CurrOperandCheckStuck
+    mov bx, CurrOperandCheckStuck
+    SetCursor 26,18,0
+    PrintMessage CurrOperandCheckStuck
+    SetCursor 26,20,0
+    PrintMessage StuckValue
+    SetCursor 26,22,0
+    PrintMessage DataLineValue
     add ax,bx
     mov Operand1Value,ax
     call  CheckCurrentUserCarry
@@ -3391,7 +3756,6 @@ wrong:
     popa
 RET
 endp GetOperandOne
-
 
 ;-------Get Second Operand-------
 GetOperandTwo proc
@@ -5344,6 +5708,7 @@ stop:
         mov Y_Circle,0
         mov P,0
         popa
+        ret
 endp DrawCircle
 
 ;-------Plotting circle-------
@@ -5401,5 +5766,137 @@ plot proc
 
     ret
     plot endp
+
+ValidateTarget proc
+pusha
+    mov TargetValid,0
+    CompareStrings AX_Reg_Value1,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings BX_Reg_Value1,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings CX_Reg_Value1,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings DX_Reg_Value1,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings SI_Reg_Value1,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings DI_Reg_Value1,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings BP_Reg_Value1,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings SP_Reg_Value1,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings AX_Reg_Value2,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings BX_Reg_Value2,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings CX_Reg_Value2,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings DX_Reg_Value2,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings SI_Reg_Value2,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings DI_Reg_Value2,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings BP_Reg_Value2,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    CompareStrings SP_Reg_Value2,NewTargetValue+2,5,OK
+    cmp OK,1
+    je invalid
+    mov TargetValid,1
+invalid:
+popa
+ret
+endp ValidateTarget 
+
+CheckDataBus2 proc
+pusha
+    cmp Power4Chosen,1
+    jne ending_checkdatabus
+    cmp StuckValue,'0'
+    jne stuck_at_one
+
+stuck_at_zero:
+    cmp DataLineValue,8
+    jae check_type_zero
+    mov bx,0
+    mov dx,1
+    mov cl,DataLineValue
+    mov ch,0
+    shl dx,cl
+    or  bx,dx
+    not bx
+    and CurrOperandCheckStuck,bx
+    jmp ending_checkdatabus
+
+check_type_zero:
+    cmp Operand2Type,2
+    je stuck_zero_big
+    cmp Operand2Type,5
+    je stuck_zero_big
+    jmp ending_checkdatabus
+
+stuck_zero_big:
+    mov bx,0
+    mov dx,1
+    mov cl,DataLineValue
+    mov ch,0
+    shl dx,cl
+    or bx,dx
+    not bx
+    and CurrOperandCheckStuck,bx
+    jmp ending_checkdatabus
+
+stuck_at_one:
+    cmp DataLineValue,8
+    jae check_type_one
+    mov bx,0
+    mov dx,1
+    mov cl,DataLineValue
+    mov ch,0
+    shl dx,cl
+    or bx,dx
+    or CurrOperandCheckStuck,bx
+    jmp ending_checkdatabus
+
+check_type_one:
+    cmp Operand2Type,2
+    je stuck_one_big
+    cmp Operand2Type,5
+    je stuck_one_big
+    jmp ending_checkdatabus
+
+stuck_one_big:
+    mov bx,0
+    mov dx,1
+    mov cl,DataLineValue
+    mov ch,0
+    shl dx,cl
+    or bx,dx
+    not bx
+    or bx,cx
+    or CurrOperandCheckStuck,bx
+    jmp ending_checkdatabus
+
+ending_checkdatabus:
+    mov Power4Chosen,0
+popa
+ret
+endp CheckDataBus2 
 
 end main
