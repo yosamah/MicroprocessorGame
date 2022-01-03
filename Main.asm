@@ -1758,6 +1758,10 @@ test6                   dw 70
 ;;
 
 
+;------Mul Variables-------
+
+mul_al                  dw ?
+mul_dx                  dw ?
 
 ;;Scan Codes
 Arrow_Up                equ 48h
@@ -2614,6 +2618,7 @@ FirstPowerUp:
 
 FirstPowerUpLevel2:
     cmp IntialPoints1,30
+
     jbe WrongPowerUp
     mov Power1User1LV2,1
     Set4Dig IntialPoints1,IP1
@@ -2840,6 +2845,7 @@ start2:
     je FourthPowerUp2
     cmp PowerUpChosen,6
     je FifthPowerUp2
+    SetCursor UserCommand2Col,UserCommand2row,0
     PrintMessage WrongPowerUpMSG
     push ax
     mov ah,0
@@ -3130,6 +3136,11 @@ pusha
     cmp OK,1
     je dec_loop
 
+    
+    CompareStrings Op_to_Execute,mulCommand,4,OK
+    cmp OK,1
+    je mul_loop
+
     ;Validaate operand 2
     call GetOperandTwo
     call ValidateOp2
@@ -3152,9 +3163,6 @@ pusha
  ;SetCursor 26,14,0
  ;PrintMessage Operand2Type
 
-    CompareStrings Op_to_Execute,mulCommand,4,OK
-    cmp OK,1
-    je mul_loop
 
     CompareStrings Op_to_Execute,divCommand,4,OK
     cmp OK,1
@@ -3639,11 +3647,87 @@ mov_loop:
     jmp msh_bayz
 
 mul_loop:
-    pusha
+    call TypeOp
+    call GetOperandTwo
+    isEmptyString Operand2,OK
+    cmp OK,0
+    je bayz
+    call GetOperandValueUser2
+    cmp Operand1Type, 1
+    je mul_smallReg
 
+    cmp Operand1Type, 3
+    je mul_smallReg
+
+    cmp Operand1Type, 4
+    je mul_smallReg
+
+    cmp Operand1Type, 2
+    je mul_BigReg
+
+    cmp Operand1Type, 5
+    je mul_BigReg
+
+mul_smallReg:
+pusha
+    cmp CurrUser, 2
+    je user2_mul
+    AsciiToNumber AL_Reg_Value2,0,mul_al 
+    jmp kaml
+    user2_mul:
+    AsciiToNumber AL_Reg_Value1,0,mul_al 
+kaml:
+
+    mov ax, mul_al
+    mov bx, Operand1Value
+    mul bl 
+    mov Operand1Value, ax
+    cmp CurrUser, 2
     
+    je user2_mulAx
+    NumbertoAscii4byte Operand1Value,AX_Reg_Value2
+    UpdateSmallReg AX_Reg_Value2, AH_Reg_Value2, AL_Reg_Value2
     popa
+    jmp msh_bayz
+    user2_mulAx:
+    NumbertoAscii4byte Operand1Value,AX_Reg_Value1
+    UpdateSmallReg AX_Reg_Value1, AH_Reg_Value1, AL_Reg_Value1
+    popa
+    jmp msh_bayz
+mul_BigReg:
+pusha
+ cmp CurrUser, 2
+    je user2_mul2
+    AsciiToNumber AX_Reg_Value2,0,mul_al 
+    jmp kaml2
+    user2_mul2:
+    AsciiToNumber AX_Reg_Value1,0,mul_al 
+kaml2:
+    mov ax, mul_al
+    mov bx, Operand1Value
+    mul bx
+    mov Operand1Value, ax
+    mov mul_dx, dx
+    cmp CurrUser, 2
+    
+    je user2_mulAxDX
+    NumbertoAscii4byte Operand1Value,AX_Reg_Value2
+    UpdateSmallReg AX_Reg_Value2, AH_Reg_Value2, AL_Reg_Value2
 
+     NumbertoAscii4byte mul_dx,DX_Reg_Value2
+    UpdateSmallReg DX_Reg_Value2, DH_Reg_Value2, DL_Reg_Value2
+ 
+    popa
+    jmp msh_bayz
+    user2_mulAxDX:
+    NumbertoAscii4byte Operand1Value,AX_Reg_Value1
+    UpdateSmallReg AX_Reg_Value1, AH_Reg_Value1, AL_Reg_Value1
+
+    NumbertoAscii4byte mul_dx,DX_Reg_Value1
+    UpdateSmallReg DX_Reg_Value1, DH_Reg_Value1, DL_Reg_Value1
+ 
+    popa
+    jmp msh_bayz
 div_loop:
 
 bayz:  
