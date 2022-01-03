@@ -8,7 +8,7 @@ Debug macro charDebug
     PrintCharGraphics charDebug, White,1
 endm Debug
 
-;-------Copy the string unknown size-------
+;-------Copy the string with unknown size-------
 CopyStringDollar macro string1,string2
 local myLoop, ending_compare_string
 pusha
@@ -28,7 +28,7 @@ ending_compare_string:
 popa
 endm EmptyTheString
 
-;-------Copy the string-------
+;-------Copy the string with size 4-------
 CopyString macro string1,string2
 local myLoop
 pusha
@@ -51,11 +51,6 @@ endm EmptyTheString
 EmptyTheString macro string2,size
 local myLoop
 pusha
-    ;mov SI,offset string1
-    ;mov DI,offset string2
-    ;mov cl,size
-    ;mov ch,0
-    ;REP MOVSB
     mov si, offset string2
     mov cl,size
     mov ch,0
@@ -65,16 +60,6 @@ pusha
         dec cx
         cmp cx, 0
     jnz myLoop
-               
-    ;mov si, offset string2
-    ;mov cl,size
-    ;mov ch,0
-    ;myLoop:
-    ;    mov [si], '$'
-    ;    inc si
-    ;    dec cx
-    ;    cmp cx, 0
-    ;jnz myLoop
    
 popa
 endm EmptyTheString
@@ -82,6 +67,8 @@ endm EmptyTheString
 ;------PUT ZERO IN ALL REGISTERS--------------
 ;------FOR START GAME AND POWER UP------------
 ;------0 for all registers and data segment---
+;------1 for user 1 registers-----------------
+;------2 for user 2 registers-----------------
 ZeroALL macro user
 LOCAL user_2_zeroing,user_1_zeroing,ending_zeroall
     pusha
@@ -139,12 +126,12 @@ user_2_zeroing:
     MoveString4Bytes ZerosMSG,BP_Reg_Value2
     MoveString4Bytes ZerosMSG,SP_Reg_Value2
     
-
  ending_zeroall:   
     popa
 endm ZeroALL
 
-;---------Check Data Bus Stuck----------
+;--Check Data Bus Stuck From PowerUp 4--
+;---------Called each time--------------
 CheckDataBus Macro CurrOperandCheckStuck
 LOCAL stuck_at_zero,check_type_zero,stuck_zero_big,stuck_at_one,check_type_one,stuck_one_big,ending_checkdatabus
 pusha
@@ -461,6 +448,8 @@ endm MoveString4Bytes
 
 
 ;-------Update small registers-------
+; When a 16-bit register is updated, it updates 
+; the value of its two equivalent 8-bit ones
 UpdateSmallReg Macro  regX, regH, regL
 pusha
     mov al,  regX[0]
@@ -475,7 +464,8 @@ popa
 endm UpdateSmallReg
 
 ;-------Update big registers-------
-;;;Called when we change AL;;; 
+; When an lower 8-bit register is updated, it updates 
+; the value of its corresponding 16-bit one (Al -> AX)
 UpdateBigRegL Macro  regX, regL
 pusha
     mov al,  regL[0]
@@ -486,6 +476,8 @@ popa
 endm UpdateBigRegL
 
 ;-------Update big registers-------
+; When an upper 8-bit register is updated, it updates 
+; the value of its corresponding 16-bit one (AH -> AX)
 UpdateBigRegH Macro  regX, regH
 pusha
     mov al,  regH[0]
@@ -496,7 +488,7 @@ popa
 endm UpdateBigRegH
 
 
-;-------Check String Size-------
+;-------Check if Operand is Immediate-------
 CheckImmediate MACRO Operand,OK
      LOCAL check_all_dig,check_letter,end,cont
      pusha
@@ -504,8 +496,8 @@ CheckImmediate MACRO Operand,OK
      GetStringSize Operand,OperandLength
      mov si,0
      cmp OperandLength,4
-     ja end
-check_all_dig:
+     ja end ; no immediate has more than 4 bytes
+check_all_dig:  
    cmp Operand[si],'0'
    jb end
    cmp Operand[si],'9'
@@ -527,13 +519,11 @@ end:
 endm CheckImmediate
 
 ;-------Convert from Ascii (hexa) to number-------
-;;;If u know the size send it in "val" 
-;;;if not it automatically calculates size and send 0 in "val"
+; If u know the size send it in "val" 
+; if not send 0 in val & it automatically calculates size 
 AsciiToNumber MACRO current,val,answer
 LOCAL looping,rest,setSize
     
-    ;2 for al - 2 bytes
-    ;0 for ax - 4 bytes
     pusha
     mov ax,val
     cmp ax,2
@@ -575,7 +565,7 @@ popa
 endm AsciiToNumber
 
 
-;-------Convert from Number to Ascii 4 bytes-------
+;-------Convert from 4-byte Number to Ascii-------
 NumbertoAscii4byte MACRO current,answer
 LOCAL looping,rest,rest2
 
@@ -606,7 +596,7 @@ rest:
 endm NumbertoAscii4byte
 
 
-;-------Convert from Number to Ascii 2 bytes-------
+;-------Convert from 2-byte Number to Ascii--------
 NumbertoAscii2byte MACRO current,answer
 LOCAL looping,rest,rest2
 
@@ -700,7 +690,7 @@ GetUserName MACRO UserName
     ReadMessage UserName ;get the string from the user and save it in username
     
     
-    ;checking if the name contain olnly chars
+    ;checking if the name contain only chars
     cmp UserName[2], 'A'
     jb  invalidName
     cmp UserName[2], 'Z'
@@ -723,7 +713,8 @@ GetUserName MACRO UserName
     NameComplete: 
 ENDM GetUserName
 
-;--------Reading a number from the user----------
+;--------Reading initial points from the user----------
+;--------Initial points are a 1 or 2 digit number------
 ReadNumber MACRO IntialPoints
     LOCAL loop_number_main
     LOCAL invalidcharacter
@@ -783,7 +774,7 @@ pusha
     PrintMessage ForbiddenMSG     
 
     ReadMessage Forbidden
-    UpperToLower Forbidden
+    UpperToLower Forbidden ;convert all to lowercase for easier comparison
     mov al, Forbidden+2
 
     cmp al,30h  ; check if input character is less then 0, 
@@ -807,6 +798,8 @@ popa
 ENDM ReadForbidden
 
 ;--------Reading Command and Validating It--------
+; Reads the whole command and checks if forbidden character is used
+; If used, keeps asking to re-enter until correct
 ReadCommand MACRO UserCommand,UserCommandCol,UserCommandrow,Forbidden
 LOCAL getting_command,checking,found_forbidden,ending_readcommand
 pusha
@@ -814,8 +807,7 @@ pusha
     getting_command:
     SetCursor UserCommandCol,UserCommandrow,0
     ReadMessage UserCommand
-    ;SetCursor 26,19,0
-    ;PrintMessage UserCommand
+
     UpperToLower UserCommand
     mov si,offset UserCommand+2
     mov al, Forbidden
@@ -839,7 +831,6 @@ found_forbidden:
     jmp getting_command
 
 ending_readcommand:
-
 popa
 ENDM ReadForbidden
 
@@ -888,6 +879,7 @@ DrawLineGraphics Macro start,end,HV,flag,color
     bara: popa
 
 endm DrawLineGraphics
+
 ;--------Draw rectangle----------
 DrawRectangle Macro x1,y1,x2,y2,color
 
@@ -897,6 +889,7 @@ DrawRectangle Macro x1,y1,x2,y2,color
     DrawLineGraphics x1,x2,y2,1,color
 
 ENDM DrawRectangle
+
 ;--------Draw filled rectangle----------
 DrawFilledRectangle macro x1,y1,x2,y2,colorBorder,colorFill
     LOCAL MyZeft
@@ -927,8 +920,6 @@ DrawRegisters  MACRO x1,y1
     DrawFilledRectangle x1+16,y1,x1+26,y1+43,White,Purple
     DrawFilledRectangle x1+32,y1,x1+42,y1+43,White,Purple
     DrawFilledRectangle x1+48,y1,x1+58,y1+43,White,Purple
-
-     ;DrawFilledRectangle x1+70,y1,x1+65,y1+43,White,Purple
 
 ENDM DrawRegisters
 
@@ -989,7 +980,7 @@ pusha
 popa
 endm UpperToLower
 
-;--------Upper to lower case----------
+;--------Lower to uppercase----------
 LowertoUpperSize Macro InputString,size
     Local loop1,loop2
 pusha
@@ -1013,6 +1004,8 @@ popa
 endm UpperToLower
 
 ;--------Set 4 Digits----------
+; Converts ascii to decimal number
+; Used for initial points 
 Set4Dig Macro IntialPoints,IntialPoints_Meg
     pusha
     mov ax,IntialPoints
@@ -1055,7 +1048,8 @@ Set1Dig Macro IntialPoints,IntialPoints_Meg
 ENDM Set1Dig
 
 
-;--------Get Minimum----------
+;--------Get Minimum of two numbers----------
+; Used for intial points
 GetMin Macro x,y,Min
     Local Exit
     pusha
@@ -1069,27 +1063,6 @@ GetMin Macro x,y,Min
     Exit:
 
 ENDM GetMin
-
-;-------Load Registers-------
-LoadReg Macro AX_Reg_Value,BX_Reg_Value,CX_Reg_Value,DX_Reg_Value,SI_Reg_Value,DI_Reg_Value,SP_Reg_Value,BP_Reg_Value,CF ;CF-> carry flag
-    Local ClearCarry,Exit
-
-    mov ax, AX_Reg_Value
-    mov bx, BX_Reg_Value
-    mov cx, CX_Reg_Value
-    mov dx, DX_Reg_Value
-    mov si, SI_Reg_Value
-    mov di, DI_Reg_Value
-    mov sp, SP_Reg_Value
-    mov bp, BP_Reg_Value
-    cmp CF,0
-    je ClearCarry
-    stc
-    jmp Exit
-    ClearCarry:
-    clc
-    Exit:
-ENDM LoadReg
 
 
 ;--------Set Brush----------
@@ -1113,12 +1086,14 @@ CLCWindow Macro
     PrintMessage UserCommandEmpty+2
     popa
 ENDM CLCWindow
+
 ;----------Store the input of the keyboard--------
 GetKeyPressed Macro
     ;which key is pressed "AL = ASCII char" 
     mov ah,0
     int 16h
 ENDM GetKeyPressed
+
 ;--------Draw bullet/object--------
 Drawbullet Macro col,Row,size,color
     Local bullet
@@ -1143,6 +1118,7 @@ Drawbullet Macro col,Row,size,color
     popa
 
 ENDM Drawbullet
+
 ;------Check Collision------
 Collison Macro
     Local True,checkColRange,false,Done,TaniCol
@@ -1181,6 +1157,7 @@ false:
 Done:
     popa
 ENDM Collison
+
 ;------Bullet Action------
 BulletAction Macro T
     Local Check,Miss,MabrokKsabtPoint,End
@@ -1230,8 +1207,10 @@ MabrokKsabtPoint:
 End:
     popa
 ENDM BulletAction
+
 ;-------Get system Time-------
-;after calling this macro the "CH = hour" , "CL = Minute" , "DH = Seconds" , "DL = 1:100 Seconds"
+;after calling this macro the "CH = hour" , "CL = Minute" 
+;"DH = Seconds" , "DL = 1:100 Seconds"
 SystemTime Macro
     mov ah , 2ch
     int 21h
@@ -1285,9 +1264,9 @@ DrawSpaceShip Macro color
     cmp ax ,spaceship_height
     jng T3alaTani
     popa
-
-    
+   
 ENDM DrawSpaceShip
+
 ;--------Ship Action---------
 ShipAction Macro
     Local ExitGame,MoveUp,MoveDown,MoveLeft,MoveRight,hit
@@ -1359,17 +1338,20 @@ MainMenu  MACRO
     
     changeTextmode  
     WelcomeText
-    ;Get Info  of user1 
+
+    ;Getting Info  of user1 
     GetUserName User1Name
     ReadNumber IntialPoints1
     ReadForbidden Forbidden2
     call GetEnter
 
-    ;Get Info  of user2 
+    ;Getting Info  of user2 
     GetUserName User2Name
     ReadNumber IntialPoints2
     ReadForbidden Forbidden1
     call GetEnter
+
+    ;Setting minimum initial points
     GetMin IntialPoints1,IntialPoints2,MinIP
     pusha
     mov ax, MinIP
@@ -1602,6 +1584,7 @@ messageinvalidcharacter DB 'Invalid Input',10,13, '$'
 ChatHeight              equ 11
 ChatLength              equ 80
 ChatStatusMSG1          db 'To end chat press F3 $'
+MinusPoints             db 'Point Deducted $'
 User1CursorX            db ?
 User1CursorY            db ?
 User2CursorX            db ?
@@ -1632,7 +1615,7 @@ ESCScancode             equ 1d
 
 Semicolon               db ':$'
 
-;Chosen Commands
+;-------Available Commands-------
 incCommand              db 'inc$'
 decCommand              db 'dec$'
 shlCommand              db 'shl$'
@@ -1676,6 +1659,7 @@ Operand2TypeInMemory    db ?, '$'
 
 Operand1TypeInMemoryAs  db ?, '$'
 
+;-------Available Operands-------
 AX_op                   db 'ax', '$'
 AL_op                   db 'al', '$'
 AH_op                   db 'ah', '$'
@@ -1731,8 +1715,6 @@ UserComTemp LABEL byte
 UserComTempSize         db 19
 UserComTempActualSize   db ?
 UserComTempData         db 19 dup('$') 
-
-;UserCommand2            db 14,?,14 dup('$')
 
 EmptyString12           db 12 dup('$')
 EmptyString6            db 6 dup('$')
@@ -1865,7 +1847,7 @@ ActionFlag              db 0
 Random                  db ?
 curColor                db ?
 
-;Help messeges
+;Help messages (shown at start of game)
 
 HelpText           db 'Level 1:',10,13,'1-User 1 plays first then, user 2',10,13,10,13
 db '2-After user 2 turn, the flying objects game starts, and each user',10,13, 'has ONLY one bullet',10,13,10,13
@@ -1902,7 +1884,7 @@ main endp
 
 ;---------------------Proceduers---------------------
 
-;--------Game-------
+;--------Flying Objects Game-------
 Game Proc
 
 pusha
@@ -2106,7 +2088,8 @@ popa
 
 RET
 ENDP Game
-;-------Gun movement AKA 7ark el biw biw--------
+
+;-------Gun movement AKA 7ark el pew pew--------
 MoveGun Proc
 pusha
     mov ActionFlag,0
@@ -2189,7 +2172,8 @@ ExitGame:
 popa
     RET 
 ENDP MoveGun 
-;------Move target "mal70za ghir el biw biw"------
+
+;------Move target "mal7oza ghir el pew pew"------
 MoveObject Proc
 pusha
     mov si,YBoundry
@@ -2318,7 +2302,7 @@ HelpScreen proc
     PrintMessage HelpText
     call GetEnter
     popa
-
+ret
 ENDP HelpScreen
 
 ;-------Level Screen-------
@@ -2326,6 +2310,7 @@ LevelScreen proc near
     pusha
     changeTextmode
     ClearScreen WindowStart,WindowStart,WindowEndX,WindowEndY,0
+
 starting_levelscreen:
     SetCursor 0,10,0
     PrintMessage LevelInputMSG
@@ -2347,6 +2332,8 @@ endp LevelScreen
 
 
 ;-------Input Registers Screen LV2-------
+; Screen that shows up in Level 2 for 
+; initializing the registers for both users
 InputRegistersScreen proc near
     pusha
     changeTextmode
@@ -2361,10 +2348,6 @@ starting_user1:
     ReadMessage InputRegisterLevel2
     CopyString InputRegisterLevel2,AX_Reg_Value1
     UpdateSmallReg AX_Reg_Value1,AH_Reg_Value1,AL_Reg_Value1
-    
-    ;SetCursor 5,2,0
-    ;PrintMessage InputRegisterLevel2
-    ;PrintMessage AX_Reg_Value1
 
 
     SetCursor 0,4,0
@@ -2425,7 +2408,6 @@ starting_user2:
     PrintMessage AX_Reg
     SetCursor 5,2,0
     ReadMessage InputRegisterLevel2
-    ;CompareStrings InputRegisterLevel2+2,WinnerVariable,4,OK
     CopyString InputRegisterLevel2,AX_Reg_Value2
     UpdateSmallReg AX_Reg_Value2,AH_Reg_Value2,AL_Reg_Value2
 
@@ -2608,7 +2590,9 @@ start1:
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
 
-    ;Check if PowerUp
+    ; Check if PowerUp
+    ; If F1: jump to CallExecute i.e: directly execute command
+    ; If F2: jump to start1 i.e: choose power-up first
     cmp GameKeyScanCode,F1Scancode
     je CallExecute
     cmp GameKeyScanCode,F2Scancode
@@ -2617,24 +2601,26 @@ start1:
     ;Choose which power-up
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage KeyPressChoose
+
     GetKeyWait PowerUpChosen,GameKeyAscii
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
 
 
-    cmp PowerUpChosen,2 ;;scan-code for 1 on keyboard
+    cmp PowerUpChosen,2 ;2 is scan-code for 1 on keyboard
     je FirstPowerUp
-    cmp PowerUpChosen,3
+    cmp PowerUpChosen,3 ;3 is scan-code for 2 on keyboard
     je SecondPowerUp
-    cmp PowerUpChosen,4
+    cmp PowerUpChosen,4 ;4 is scan-code for 3 on keyboard
     je ThirdPowerUp
-    cmp PowerUpChosen,5
+    cmp PowerUpChosen,5 ;5 is scan-code for 4 on keyboard
     je FourthPowerUp
-    cmp PowerUpChosen,6
+    cmp PowerUpChosen,6 ;6 is scan-code for 5 on keyboard
     je FifthPowerUp
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage WrongPowerUpMSG
 
+    ;Wait any key press to proceed to execute 
     push ax
     mov ah,0
     int 16h
@@ -2644,13 +2630,14 @@ start1:
     PrintMessage UserCommandSpaces
     jmp CallExecute
 
-;Command on your own processor
+;Command on your own processor (Level 1)
+;Changing target value (Level 2)
 FirstPowerUp:
 
-    cmp LevelVariable+2,'1'
-    je FirstPowerUpLevel1
-    cmp Power1User1LV2,1
-    jne FirstPowerUpLevel2
+    cmp LevelVariable+2,'1' 
+    je FirstPowerUpLevel1 
+    cmp Power1User1LV2,1 ; Check if first power up in level 2 is already used
+    jne FirstPowerUpLevel2 ; if used, proceed to execute command & skip power up
 
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage PowerUsedMSG
@@ -2661,38 +2648,46 @@ FirstPowerUp:
     jmp CallExecute
 
 FirstPowerUpLevel2:
-    cmp IntialPoints1,30
+    cmp IntialPoints1,30 ;check if there's enough points
 
     jbe WrongPowerUp
     mov Power1User1LV2,1
     Set4Dig IntialPoints1,IP1
 
+    ; Reading new target value
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage EnterTarget
     ReadMessage NewTargetValue
+
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
+
+    ; Validating input target value
     call ValidateTarget
     cmp TargetValid,1
     je change_target
+
+    ; Notifying user new target value is invalid
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage ValueExists
     GetKeyWait ScanCode,ScanCode
     SetCursor UserCommand2Col,UserCommand2row,0
     PrintMessage UserCommandSpaces
     jmp CallExecute
+
 change_target:
     sub IntialPoints1,30
     LowertoUpperSize NewTargetValue,4
-    CopyString NewTargetValue,WinnerVariable
+    CopyString NewTargetValue,WinnerVariable ;copying value to actual WinnerVariable
     jmp CallExecute
+
 FirstPowerUpLevel1:
     cmp IntialPoints1,5
     jbe WrongPowerUp
     sub IntialPoints1,5
     Set4Dig IntialPoints1,IP1
 
-ChooseProcessorLevel2User1:    
+ChooseProcessorLevel2User1:  ;label to execute command on own processor level 2 without points deduction
     mov Power1Chosen,1
     mov CurrUser,2
     ReadCommand UserCommand2,UserCommand1Col,UserCommand1row,Forbidden1Data
@@ -2704,7 +2699,7 @@ jmp Resetting1
 ;Command on your processor and your opponent processor 
 SecondPowerUp:
 
-    cmp IntialPoints1,3
+    cmp IntialPoints1,3 ;check enough points
     jbe WrongPowerUp
     sub IntialPoints1,3
     Set4Dig IntialPoints1,IP1
@@ -2724,16 +2719,19 @@ jmp Resetting1
 ThirdPowerUp:
 
     mov Power3Chosen, 1
-    cmp IntialPoints1,8
+    cmp IntialPoints1,8 ;check enough points
     jbe WrongPowerUp
     sub IntialPoints1,8
     Set4Dig IntialPoints1,IP1
+
+    ;Reading new forbidden
     CopyStringDollar Forbidden1,ForbidTemp
     SetCursor UserCommand1Col,UserCommand1row,0
     ReadMessage Forbidden1
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
     ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
+
     call excCommand
     CopyStringDollar ForbidTemp,Forbidden1
 
@@ -2741,9 +2739,11 @@ jmp Resetting1
 
 
 ;Data lines stuck
+;Stuck value has 0 or 1
+;DataLine value has 0-16 (which bit to stick)
 FourthPowerUp:
 
-    cmp IntialPoints1,2
+    cmp IntialPoints1,2 ;check enough points
     jbe WrongPowerUp
     sub IntialPoints1,2
     Set4Dig IntialPoints1,IP1
@@ -2751,13 +2751,14 @@ FourthPowerUp:
     PrintMessage Power4StuckMSG
     ReadMessage Stuck
 
+    ;validating stuck value is 0 or 1
     cmp StuckValue,'0'
     je check_dataline
     cmp StuckValue,'1'
     je check_dataline
     jmp WrongPowerUp
 
-check_dataline:
+check_dataline: ;check if dataline chosen is 0 - 9 and sub 30h to convert to number
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
     SetCursor UserCommand1Col,UserCommand1row,0
@@ -2770,7 +2771,7 @@ check_dataline:
     sub DataLineValue,30h
     jmp start_execute_power4
 
-check_letter:
+check_letter: ;check if dataline chosen is A - F and sub 37h to convert to number
     cmp DataLineValue,'A'
     jb WrongPowerUp
     cmp DataLineValue,'F'
@@ -2788,9 +2789,12 @@ jmp Resetting1
 
 
 ;Clearing all registers
+;Just calls Zero All
 FifthPowerUp:
     cmp Power5User1,1
     jne start_power5
+
+    ;Check if power up is already used before
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage PowerUsedMSG
     GetKeyWait ScanCode,ScanCode
@@ -2807,7 +2811,7 @@ start_power5:
     call Refresh
 jmp Resetting1
 
-
+;Message to when you don't have enough points
 WrongPowerUp:
     
     SetCursor UserCommand1Col,UserCommand1row,0
@@ -2822,10 +2826,11 @@ WrongPowerUp:
     PrintMessage UserCommandSpaces
 
 CallExecute:
-    call Refresh
+    call Refresh ;update register values
     cmp LevelVariable+2,'2'
     jne start_execute
 
+    ;Choose which processor (for level 2)
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage ChooseProc
 
@@ -2835,7 +2840,7 @@ CallExecute:
     PrintMessage UserCommandSpaces
 
     cmp ProcessorChosen+2,'1'
-    je ChooseProcessorLevel2User1
+    je ChooseProcessorLevel2User1 ;Jumps to power up 1 in Level 1 (same functionality)
 
 start_execute:   
     ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
@@ -2849,7 +2854,6 @@ Resetting1:
     mov Power1Chosen,0
     mov Power2Chosen,0
     mov Power3Chosen,0
-    ;mov Power4Chosen,0
     mov Power5Chosen,0
 
     ;Check if there's a winner
@@ -2858,6 +2862,7 @@ Resetting1:
     cmp IntialPoints2,0
     je Ending_WriteCommand
 
+;Same as upwards but for user 2
 start2:  
     SetCursor UserCommand1Col,UserCommand1row,0     
     PrintMessage UserCommandSpaces
@@ -2890,7 +2895,7 @@ start2:
     je FirstPowerUp2
     cmp PowerUpChosen,3
     je SecondPowerUp2
-    cmp PowerUpChosen,4
+    cmp PowerUpChosen,4    
     je ThirdPowerUp2
     cmp PowerUpChosen,5
     je FourthPowerUp2
@@ -2908,7 +2913,8 @@ start2:
     PrintMessage UserCommandSpaces
     jmp CallExecute2
 
-;Command on your own processor
+;Command on your own processor (Level 1)
+;Target value update (Level 2)
 FirstPowerUp2:
     cmp LevelVariable+2,'1'
     je FirstPowerUpLevel1_2
@@ -3105,10 +3111,8 @@ Resetting2:
     mov Power1Chosen,0
     mov Power2Chosen,0
     mov Power3Chosen,0
-    ;mov Power4Chosen,0
     mov Power5Chosen,0
 
-   ;call FlyingObj
 Ending_WriteCommand:
     mov CurrUser,1
     call Refresh 
@@ -3119,14 +3123,10 @@ endp WriteCommand
 excCommand proc
     
 pusha
-    ;moving UserCommand into CurCommand
-    
-    ;SetCursor 23,17,0
-    ;PrintMessage IntialPoints1
     
     cmp CurrUser,1
     je excCommand_User1
-
+ ; Copying usercommand1 or 2 to CurrCommand (for general usage)
         mov SI,offset UserCommand2+2
         mov DI,offset CurCommand
         mov cl,UserCommand2+1
@@ -3144,7 +3144,7 @@ pusha
     excCommand_start:
     popa
 
-    GetStringSize CurCommand,actualSizeCommand
+    GetStringSize CurCommand,actualSizeCommand ;Calculating command size
 
     call GetCommand
     cmp found_cmd,0
@@ -3163,10 +3163,9 @@ pusha
     CompareStrings Op_to_Execute,nopCommand,4,OK
     cmp OK,1
     je nop_loop
-  
-    
+     
 
-    ;Validaate operand 1
+    ;Specifying & validating operand 1
     call GetOperandOne
     
     CompareStrings Op_to_Execute,pushCommand,5,OK
@@ -3179,25 +3178,16 @@ pusha
     je imul_loop
 
 
-; if third is not space, cmd is wrong
+    ; if third is not space, cmd is wrong
     mov dl, 3
     cmp CurCommand+3,' '
     jne bayz
-
-  
-
     
     call ValidateOp1
-    
-   
     
     cmp OK,0
     je bayz
 
-    ;SetCursor 26,13,0
-    ;PrintMessage EndProg
-    
-    ;NumbertoAscii4byte  Operand1TypeInMemory, Operand1TypeInMemoryAs
     ;single operand commands
 
     CompareStrings Op_to_Execute,incCommand,4,OK
@@ -3207,40 +3197,23 @@ pusha
     CompareStrings Op_to_Execute,decCommand,4,OK
     cmp OK,1
     je dec_loop
-
-    
+  
     CompareStrings Op_to_Execute,mulCommand,4,OK
     cmp OK,1
     je mul_loop
 
-
-   
-
-    ;Validaate operand 2
+    ;Specifying & validating operand 2
     call GetOperandTwo
     call ValidateOp2
     cmp OK,0
     je bayz
     call TypeOp
-    setCursor 27,19,0
-    PrintMessage Operand2
-    ;SetCursor 26,17,0
-    ;PrintMessage Operand2
-    ;SetCursor 26,19,0
-    ;PrintMessage CurrUser
 
     call Validate2Operands
     cmp OK,0
     je bayz
 
-  ; SetCursor 26,18,0
-   ; PrintMessage Welcome
-
- ;SetCursor 26,14,0
- ;PrintMessage Operand2Type
-
-
-   
+    ;Specifying rest of commands
     CompareStrings Op_to_Execute,shlCommand,4,OK
     cmp OK,1
     je shl_loop
@@ -3334,11 +3307,7 @@ zero_shl_loop:
     CLC
 start_shl_loop:
     mov ax,Operand1Value
-     ;SetCursor 26,16,0
-     ;PrintMessage Operand1Value
     AsciiToNumber Operand2,0,Operand2Value
-     ;SetCursor 26,18,0
-     ;PrintMessage Operand2Value
     mov cx,Operand2Value
     mov ch,0
     shl ax,cl
@@ -3370,11 +3339,7 @@ zero_shr_loop:
     CLC
 start_shr_loop:
     mov ax,Operand1Value
-     ;SetCursor 26,16,0
-     ;PrintMessage Operand1Value
     AsciiToNumber Operand2,0,Operand2Value
-     ;SetCursor 26,18,0
-     ;PrintMessage Operand2Value
     mov cx,Operand2Value
     mov ch,0
     shr ax,cl
@@ -3421,11 +3386,7 @@ zero_ror_loop:
     CLC
 start_ror_loop:
     mov ax,Operand1Value
-     ;SetCursor 26,16,0
-     ;PrintMessage Operand1Value
     AsciiToNumber Operand2,0,Operand2Value
-     ;SetCursor 26,18,0
-     ;PrintMessage Operand2Value
     mov cx,Operand2Value
     mov ch,0
     ror ax,cl
@@ -3457,11 +3418,7 @@ zero_rol_loop:
     CLC
 start_rol_loop:
     mov ax,Operand1Value
-     ;SetCursor 26,16,0
-     ;PrintMessage Operand1Value
     AsciiToNumber Operand2,0,Operand2Value
-     ;SetCursor 26,18,0
-     ;PrintMessage Operand2Value
     mov cx,Operand2Value
     mov ch,0
     rol ax,cl
@@ -3493,11 +3450,7 @@ zero_rcl_loop:
     CLC
 start_rcl_loop:
     mov ax,Operand1Value
-     ;SetCursor 26,16,0
-     ;PrintMessage Operand1Value
     AsciiToNumber Operand2,0,Operand2Value
-     ;SetCursor 26,18,0
-     ;PrintMessage Operand2Value
     mov cx,Operand2Value
     mov ch,0
     rcl ax,cl
@@ -3529,14 +3482,10 @@ zero_rcr_loop:
     CLC
 start_rcr_loop:
     mov ax,Operand1Value
-     ;SetCursor 26,16,0
-     ;PrintMessage Operand1Value
     AsciiToNumber Operand2,0,Operand2Value
-     ;SetCursor 26,18,0
-     ;PrintMessage Operand2Value
     mov cx,Operand2Value
     mov ch,0
-    rcr ax,cl ; ghalat el mafrood rcr
+    rcr ax,cl 
     mov Operand1Value,ax
     adc CheckCarry,0
     mov bl,CheckCarry
@@ -3556,23 +3505,13 @@ nop_loop:
 
 add_loop:
     Call GetOperandValueUser2
-    ;SetCursor 26,16,0
-    ;PrintMessage Operand2
     Call GetOperandValueUser1
-    ;SetCursor 26,18,0
-    ;PrintMessage Operand1
     pusha
     mov ax,Operand1Value
     mov bx,Operand2Value
     mov CurrOperandCheckStuck,bx
     CheckDataBus  CurrOperandCheckStuck
     mov bx, CurrOperandCheckStuck
-    SetCursor 26,18,0
-    PrintMessage CurrOperandCheckStuck
-    SetCursor 26,20,0
-    PrintMessage StuckValue
-    SetCursor 26,22,0
-    PrintMessage DataLineValue
     add ax,bx
     mov Operand1Value,ax
     call  CheckCurrentUserCarry
@@ -3582,11 +3521,7 @@ add_loop:
 
 sub_loop:
     Call GetOperandValueUser2
-    ;SetCursor 26,16,0
-    ;PrintMessage Operand2
     Call GetOperandValueUser1
-    ;SetCursor 26,18,0
-    ;PrintMessage Operand1
     pusha
     mov ax,Operand1Value
     mov bx,Operand2Value
@@ -3599,11 +3534,7 @@ sub_loop:
 
 adc_loop:
     Call GetOperandValueUser2
-    ;SetCursor 26,16,0
-    ;PrintMessage Operand2
     Call GetOperandValueUser1
-    ;SetCursor 26,18,0
-    ;PrintMessage Operand1
     pusha
     call LoadCurrentUsercarry
     mov ax,Operand1Value
@@ -3617,12 +3548,8 @@ adc_loop:
 
 sbb_loop:
 
-     Call GetOperandValueUser2
-    ;SetCursor 26,16,0
-    ;PrintMessage Operand2
+    Call GetOperandValueUser2
     Call GetOperandValueUser1
-    ;SetCursor 26,18,0
-    ;PrintMessage Operand1
     pusha
     call LoadCurrentUsercarry
     mov ax,Operand1Value
@@ -3635,33 +3562,26 @@ sbb_loop:
     jmp msh_bayz
 
 or_loop:
-    ;SetCursor 26,16,0
-    ;PrintMessage orCommand
     cmp CurCommand+2,' '
     jne bayz
-    ;Validaate operand 1
+    ;Validate operand 1
     call GetOperandOne
     call ValidateOp1
     cmp OK,0
     je bayz
-    ;Validaate operand 2
+    ;Validate operand 2
     call GetOperandTwo
     call ValidateOp2
     cmp OK,0
     je bayz
-    ;SetCursor 26,15,0
-    ;PrintMessage f1Pressed
     call TypeOp
     call Validate2Operands
     cmp OK,0
     je bayz
 
     Call GetOperandValueUser2
-    ;SetCursor 26,16,0
-    ;PrintMessage Operand2
     Call GetOperandValueUser1
-    ;SetCursor 26,18,0
-    ;PrintMessage Operand1
+
     pusha
     mov ax,Operand1Value
     mov bx,Operand2Value
@@ -3674,11 +3594,8 @@ or_loop:
 
 xor_loop:
     Call GetOperandValueUser2
-    ;SetCursor 26,16,0
-    ;PrintMessage Operand2
     Call GetOperandValueUser1
-    ;SetCursor 26,18,0
-    ;PrintMessage Operand1
+
     pusha
     mov ax,Operand1Value
     mov bx,Operand2Value
@@ -3691,11 +3608,8 @@ xor_loop:
 
 and_loop:
     Call GetOperandValueUser2
-    ;SetCursor 26,16,0
-    ;PrintMessage Operand2
     Call GetOperandValueUser1
-    ;SetCursor 26,18,0
-    ;PrintMessage Operand1
+
     pusha
     mov ax,Operand1Value
     mov bx,Operand2Value
@@ -3707,11 +3621,9 @@ and_loop:
     jmp msh_bayz
 
 mov_loop:
-    ;cmp Operand2Type,4
-    ;Call GetOperandValueUser2
+
     Call GetOperandValueUser1
     pusha
-    ;mov ax,Operand1Value
     mov bx,Operand2Value
     mov ax,bx
     mov Operand1Value,ax
@@ -3787,7 +3699,7 @@ kaml2:
     NumbertoAscii4byte Operand1Value,AX_Reg_Value2
     UpdateSmallReg AX_Reg_Value2, AH_Reg_Value2, AL_Reg_Value2
 
-     NumbertoAscii4byte mul_dx,DX_Reg_Value2
+    NumbertoAscii4byte mul_dx,DX_Reg_Value2
     UpdateSmallReg DX_Reg_Value2, DH_Reg_Value2, DL_Reg_Value2
  
     popa
@@ -3899,8 +3811,6 @@ ikaml2:
 
 jmp msh_bayz
 bayz:  
-    SetCursor 17,23,0
-    PrintMessage ChatStatusMSG1
     cmp CurrUser,2
     je bayz_user2
     cmp Power1Chosen,1
@@ -3938,12 +3848,6 @@ EmptyTheString Operand2,7
 mov Operand1Value, 0
 mov Operand2Value, 0
 call Refresh
-;SetCursor 26,18,0
-;PrintMessage AX_Reg_Value2
-;SetCursor 26,20,0
-;PrintMessage AH_Reg_Value2
-;SetCursor 26,22,0
-;PrintMessage AL_Reg_Value2
 
 RET
 ENDP excCommand
@@ -4365,8 +4269,6 @@ Validate2Operands proc near
 
     operandTypeMismatch:
         mov OK,0
-        ;SetCursor 22,14,0
-        ;PrintMessage SI_op
     Finish:
 ret
 endp Validate2Operands
@@ -5536,8 +5438,8 @@ endp GetOperandValueUser1
 GetOperandValueUser2 proc
 
     pusha
-    ;checking on indirect
-        ;checking on based relative
+
+    ;checking on based relative
     CompareStrings Operand1,BXRelOne,6,OK
     cmp OK,1
     je BXRelOneisOP2
@@ -5577,6 +5479,7 @@ GetOperandValueUser2 proc
     cmp OK,1
     je DIRelFourisOP2
 
+    ;checking on indirect
     CompareStrings Operand1,BX_op_idx,4,OK
     cmp OK,1
     je BXidxisOP2
@@ -6279,8 +6182,6 @@ user2_direlfour:
 
 Set_Mem_Type:
     pusha
-    SetCursor 22,14,0
-    PrintMessage TemporaryCheckMem
     mov ax,TemporaryCheckMem
     mov Operand1TypeInMemory,al
     popa
@@ -6348,7 +6249,6 @@ OP1MEM:
 
     
 finished_GetOperandValueUser2:
-    ;mov TemporaryCheckMem,7
     popa
     ret
 endp GetOperandValueUser2
@@ -6703,96 +6603,6 @@ finished_LoadOperandValueUser:
     popa
     ret
 endp LoadOperandValueUser1
-
-;-------Load Value in Operand1 for User2 Registers-------
-LoadOperandValueUser2 proc
-
-    pusha
-    CompareStrings Operand1,AX_op,3,OK
-    cmp OK,1
-    je AXisLoad2
-    CompareStrings Operand1,AL_op,3,OK
-    cmp OK,1
-    je ALisLoad2
-    CompareStrings Operand1,AH_op,3,OK
-    cmp OK,1
-    je AHisLoad2
-    CompareStrings Operand1,BX_op,3,OK
-    cmp OK,1
-    je BXisLoad2
-    CompareStrings Operand1,BL_op,3,OK
-    cmp OK,1
-    je BLisLoad2
-    CompareStrings Operand1,BH_op,3,OK
-    cmp OK,1
-    je BHisLoad2
-    CompareStrings Operand1,CX_op,3,OK
-    cmp OK,1
-    je CXisLoad2
-    CompareStrings Operand1,CL_op,3,OK
-    cmp OK,1
-    je CLisLoad2
-    CompareStrings Operand1,CH_op,3,OK
-    cmp OK,1
-    je CHisLoad2
-    CompareStrings Operand1,DX_op,3,OK
-    cmp OK,1
-    je DXisLoad2
-    CompareStrings Operand1,DL_op,3,OK
-    cmp OK,1
-    je DLisLoad2
-    CompareStrings Operand1,DH_op,3,OK
-    cmp OK,1
-    je DHisLoad2
-    CompareStrings Operand1,SI_op,3,OK
-    cmp OK,1
-    je SIisLoad2
-    CompareStrings Operand1,DI_op,3,OK
-    cmp OK,1
-    je DIisLoad2
-    CompareStrings Operand1,SP_op,3,OK
-    cmp OK,1
-    je SPisLoad2
-    CompareStrings Operand1,BP_op,3,OK
-    cmp OK,1
-    je BPisLoad2
-    CompareStrings Operand1,BX_op_idx,5,OK
-    cmp OK,1
-    je BXidxisLoad2
-    CompareStrings Operand1,SI_op_idx,5,OK
-    cmp OK,1
-    je SIidxisLoad2
-    CompareStrings Operand1,DI_op_idx,5,OK
-    cmp OK,1
-    je DIidxisLoad2
-    jmp finished_LoadOperandValueUser2
- AXisLoad2:
-       NumbertoAscii4byte Operand1Value,AX_Reg_Value2
- ALisLoad2:
- AHisLoad2:
- BXisLoad2:
- BLisLoad2:
- BHisLoad2:
- CXisLoad2:
- CLisLoad2:
- CHisLoad2:
- DXisLoad2:
- DLisLoad2:
- DHisLoad2:
- SIisLoad2:
- DIisLoad2:
- SPisLoad2:
- BPisLoad2:
- BXidxisLoad2:
- SIidxisLoad2:
- DIidxisLoad2:
-     
-finished_LoadOperandValueUser2:
-    ;call Refresh
-    ;call GameScreen
-    popa
-    ret
-endp LoadOperandValueUser2
 
 ;-------Game Screen-------
 ;Key pressed if F1 -> write command directly
@@ -7156,7 +6966,6 @@ Refresh proc
     PrintMessage User1Name+2
     SetCursor User1Name+1,0,0
     PrintMessage Semicolon
-    ;AsciiToNumber IP1,0,IntialPoints1
     Set4Dig IntialPoints1,IP1
 
     PrintMessage IP1
@@ -7171,7 +6980,6 @@ Refresh proc
     popa
 
     Set4Dig IntialPoints2,IP2
-    ;AsciiToNumber IP2,0,IntialPoints2
 
     PrintMessage IP2
     jmp Refresh_ending
@@ -7364,80 +7172,5 @@ invalid:
 popa
 ret
 endp ValidateTarget 
-
-CheckDataBus2 proc
-pusha
-    cmp Power4Chosen,1
-    jne ending_checkdatabus
-    cmp StuckValue,'0'
-    jne stuck_at_one
-
-stuck_at_zero:
-    cmp DataLineValue,8
-    jae check_type_zero
-    mov bx,0
-    mov dx,1
-    mov cl,DataLineValue
-    mov ch,0
-    shl dx,cl
-    or  bx,dx
-    not bx
-    and CurrOperandCheckStuck,bx
-    jmp ending_checkdatabus
-
-check_type_zero:
-    cmp Operand2Type,2
-    je stuck_zero_big
-    cmp Operand2Type,5
-    je stuck_zero_big
-    jmp ending_checkdatabus
-
-stuck_zero_big:
-    mov bx,0
-    mov dx,1
-    mov cl,DataLineValue
-    mov ch,0
-    shl dx,cl
-    or bx,dx
-    not bx
-    and CurrOperandCheckStuck,bx
-    jmp ending_checkdatabus
-
-stuck_at_one:
-    cmp DataLineValue,8
-    jae check_type_one
-    mov bx,0
-    mov dx,1
-    mov cl,DataLineValue
-    mov ch,0
-    shl dx,cl
-    or bx,dx
-    or CurrOperandCheckStuck,bx
-    jmp ending_checkdatabus
-
-check_type_one:
-    cmp Operand2Type,2
-    je stuck_one_big
-    cmp Operand2Type,5
-    je stuck_one_big
-    jmp ending_checkdatabus
-
-stuck_one_big:
-    mov bx,0
-    mov dx,1
-    mov cl,DataLineValue
-    mov ch,0
-    shl dx,cl
-    or bx,dx
-    not bx
-    or bx,cx
-    or CurrOperandCheckStuck,bx
-    jmp ending_checkdatabus
-
-ending_checkdatabus:
-    mov Power4Chosen,0
-popa
-ret
-endp CheckDataBus2 
 
 end main
