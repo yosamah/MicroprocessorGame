@@ -2318,7 +2318,7 @@ HelpScreen proc
     PrintMessage HelpText
     call GetEnter
     popa
-
+ret
 ENDP HelpScreen
 
 ;-------Level Screen-------
