@@ -1865,6 +1865,22 @@ ActionFlag              db 0
 Random                  db ?
 curColor                db ?
 
+;Help messeges
+
+HelpText           db 'Level 1:',10,13,'1-User 1 plays first then, user 2',10,13,10,13
+db '2-After user 2 turn, the flying objects game starts, and each user',10,13, 'has ONLY one bullet',10,13,10,13
+db '3-At each plyer turn, they should press F1 or F2: ',10,13
+db 'F1: Directly execute a command on opponent processor',10,13
+db 'F2: Choose powerup and then execute a command *Check manual for Powerups*',10,13,10,13
+db '4-Whenever you enter a wrong command, 1 point is automatically deducted and you lose your turn',10,13
+db '5-Each user chooses their opponents forbidden character, and using the forbidden character lets you re-write the command'
+db 'until the command is correct',10,13,10,13
+db '6-Points distribution in the flying objects game: ',10,13
+db '-Red:    1 point',10,13
+db '-Cyan:   2 points',10,13
+db '-Yellow: 3 Points',10,13
+db '-Green:  6 Points',10,13, '$'
+
 ;----------------------------------------------
 
 
@@ -2267,6 +2283,7 @@ MainScreen proc near
         SetCursor 0, 21, 0
         PrintMessage f2Pressed
         mov IsF2pressed, 1
+            call HelpScreen
         call LevelScreen
         cmp LevelVariable+2,'1'
         je GoGame
@@ -2291,6 +2308,18 @@ GoGame:
     RET
 endp MainScreen
 
+;--------Help Screen-------
+HelpScreen proc
+    pusha
+    changeTextmode
+    ClearScreen WindowStart,WindowStart,WindowEndX,WindowEndY,0
+
+    SetCursor 0,1,0
+    PrintMessage HelpText
+    call GetEnter
+    popa
+
+ENDP HelpScreen
 
 ;-------Level Screen-------
 LevelScreen proc near
