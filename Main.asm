@@ -1652,8 +1652,8 @@ rclCommand              db 'rcl$'
 rcrCommand              db 'rcr$'
 orCommand               db 'or $'
 mulCommand              db 'mul$'
-divCommand              db 'div$'
 pushCommand             db 'push$'
+imulCommand             db 'imul$'
 
 found_cmd               db 0
 Op_to_Execute           db 8 dup('$')
@@ -1845,7 +1845,7 @@ YHit_value              db 0
 
 
 objR                    dw 4
-objX                    dw 95
+objX                    dw 100
 objY                    dw ?
 
 obj1Y                   dw 35
@@ -2241,7 +2241,7 @@ popa
     jae resetpos
     jmp buf
     resetpos:
-    mov objX,95
+    mov objX,100
     buf:
     Drawbullet objY,objX,objR,black
     cmp CurrUser,2
@@ -3155,7 +3155,6 @@ pusha
     cmp OK,1
     je or_loop
 
-
     ;Commands with no operands
     CompareStrings Op_to_Execute,clcCommand,4,OK
     cmp OK,1
@@ -3164,19 +3163,33 @@ pusha
     CompareStrings Op_to_Execute,nopCommand,4,OK
     cmp OK,1
     je nop_loop
+  
+    
 
-    ; if third is not space, cmd is wrong
+    ;Validaate operand 1
+    call GetOperandOne
+    
+    CompareStrings Op_to_Execute,pushCommand,5,OK
+    cmp OK,1
+    je push_loop
+
+    
+    CompareStrings Op_to_Execute,imulCommand,5,OK
+    cmp OK,1
+    je imul_loop
+
+
+; if third is not space, cmd is wrong
     mov dl, 3
     cmp CurCommand+3,' '
     jne bayz
 
-    ;Validaate operand 1
-    call GetOperandOne
+  
 
-    SetCursor 26,15,0
-    PrintMessage Operand1
-
+    
     call ValidateOp1
+    
+   
     
     cmp OK,0
     je bayz
@@ -3199,6 +3212,9 @@ pusha
     CompareStrings Op_to_Execute,mulCommand,4,OK
     cmp OK,1
     je mul_loop
+
+
+   
 
     ;Validaate operand 2
     call GetOperandTwo
@@ -3224,10 +3240,7 @@ pusha
  ;PrintMessage Operand2Type
 
 
-    CompareStrings Op_to_Execute,divCommand,4,OK
-    cmp OK,1
-    je div_loop
-
+   
     CompareStrings Op_to_Execute,shlCommand,4,OK
     cmp OK,1
     je shl_loop
@@ -3788,8 +3801,103 @@ kaml2:
  
     popa
     jmp msh_bayz
-div_loop:
+push_loop:
+    call ValidateOp1
+    cmp OK,0
+    je bayz
+    call TypeOp
+    cmp Operand1Type, 1
+    je bayz
+   
+    jmp msh_bayz
 
+imul_loop:
+
+    call ValidateOp1
+    cmp OK,0
+    je bayz
+    call TypeOp
+    call GetOperandTwo
+    isEmptyString Operand2,OK
+    cmp OK,0
+    je bayz
+    call GetOperandValueUser2
+    cmp Operand1Type, 1
+    je imul_smallReg
+
+    cmp Operand1Type, 3
+    je imul_smallReg
+
+    cmp Operand1Type, 4
+    je imul_smallReg
+
+    cmp Operand1Type, 2
+    je imul_BigReg
+
+    cmp Operand1Type, 5
+    je imul_BigReg
+
+imul_smallReg:
+pusha
+    cmp CurrUser, 2
+    je user2_imul
+    AsciiToNumber AL_Reg_Value2,0,mul_al 
+    jmp ikaml
+    user2_imul:
+    AsciiToNumber AL_Reg_Value1,0,mul_al 
+ikaml:
+
+    mov ax, mul_al
+    mov bx, Operand1Value
+    imul bl 
+    mov Operand1Value, ax
+    cmp CurrUser, 2
+    
+    je user2_imulAx
+    NumbertoAscii4byte Operand1Value,AX_Reg_Value2
+    UpdateSmallReg AX_Reg_Value2, AH_Reg_Value2, AL_Reg_Value2
+    popa
+    jmp msh_bayz
+    user2_imulAx:
+    NumbertoAscii4byte Operand1Value,AX_Reg_Value1
+    UpdateSmallReg AX_Reg_Value1, AH_Reg_Value1, AL_Reg_Value1
+    popa
+    jmp msh_bayz
+imul_BigReg:
+pusha
+ cmp CurrUser, 2
+    je user2_imul2
+    AsciiToNumber AX_Reg_Value2,0,mul_al 
+    jmp ikaml2
+    user2_imul2:
+    AsciiToNumber AX_Reg_Value1,0,mul_al 
+ikaml2:
+    mov ax, mul_al
+    mov bx, Operand1Value
+    imul bx
+    mov Operand1Value, ax
+    mov mul_dx, dx
+    cmp CurrUser, 2
+    
+    je user2_imulAxDX
+    NumbertoAscii4byte Operand1Value,AX_Reg_Value2
+    UpdateSmallReg AX_Reg_Value2, AH_Reg_Value2, AL_Reg_Value2
+
+     NumbertoAscii4byte mul_dx,DX_Reg_Value2
+    UpdateSmallReg DX_Reg_Value2, DH_Reg_Value2, DL_Reg_Value2
+ 
+    popa
+    jmp msh_bayz
+    user2_imulAxDX:
+    NumbertoAscii4byte Operand1Value,AX_Reg_Value1
+    UpdateSmallReg AX_Reg_Value1, AH_Reg_Value1, AL_Reg_Value1
+
+    NumbertoAscii4byte mul_dx,DX_Reg_Value1
+    UpdateSmallReg DX_Reg_Value1, DH_Reg_Value1, DL_Reg_Value1
+ 
+    popa
+
+jmp msh_bayz
 bayz:  
     SetCursor 17,23,0
     PrintMessage ChatStatusMSG1
@@ -3816,6 +3924,8 @@ bayz_user2:
 User2true:
     dec IntialPoints2
     Set4Dig IntialPoints2,IP2
+
+  
 
 msh_bayz:
 EmptyTheString UserCommand1Data,12
@@ -3889,8 +3999,18 @@ GetOperandOne proc
     pusha
     ; indexing CurrCommand with si
     ; starting with 3 to get operands only
-    mov OK,0
+    CompareStrings Op_to_Execute,pushCommand,5,OK
+    cmp OK,1
+    je setSi3
+    CompareStrings Op_to_Execute,imulCommand,5,OK
+    cmp OK,1
+    je setSi3
     mov si,2
+    mov OK,0
+    jmp findLetter
+    setSi3:
+    mov OK,0
+    mov si,3
     findLetter: ;  removes spaces
         inc si
         cmp si,actualSizeCommand
@@ -3987,7 +4107,7 @@ compare_loop:
       cmp cx,0
       je found
       add bx,4
-      cmp bx,80
+      cmp bx,76
       je not_found
       jmp compare_loop
 
@@ -4000,7 +4120,41 @@ compare_loop:
       jmp finished    
 
  not_found:
-     mov found_cmd,0   
+    lea si,pushCommand
+    lea di,CurCommand
+    mov cx,5
+    REPE CMPSB
+    cmp cx,0
+je foundPush
+    lea si,imulCommand
+    lea di,CurCommand
+    mov cx,5
+    REPE CMPSB
+    cmp cx,0
+je foundImul
+jmp Notfound_push
+     
+ foundPush:   
+    lea si,pushCommand
+    lea di,Op_to_Execute 
+    mov cx,5
+    rep MOVSB 
+    mov found_cmd,1
+    jmp finished  
+
+foundImul:
+    
+    lea si,imulCommand
+    lea di,Op_to_Execute 
+    mov cx,5
+    rep MOVSB 
+    mov found_cmd,1
+    jmp finished  
+
+
+Notfound_push:
+     mov found_cmd,0 
+
      
 finished:
      popa
