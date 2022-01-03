@@ -1488,7 +1488,7 @@ WinnerVariable           db '105E$'
 LevelInputMSG           db 'Enter Level',10,13, '$'
 LevelVariable           db 3,?,2 DUP('$') ,'$'
 LevelundefinedMsg       db 'Level should be 1 or 2 $'
-ChooseProc              db 'Choose Processor$'
+ChooseProc              db 'Choose Processor $'
 Processor1or2           db '1 - 2$'
 ProcessorChosen         db 3,?,2 DUP('$') ,'$'
 
@@ -1700,25 +1700,37 @@ MEM1                    db '[1]', '$'
 MEM2                    db '[2]', '$'
 MEM3                    db '[3]', '$'
 MEM4                    db '[4]', '$'
+BXRelOne                db '[bx+1]','$'
+BXRelTwo                db '[bx+2]','$'
+BXRelThr                db '[bx+3]','$'
+BXRelFour               db '[bx+4]','$'
+SIRelOne                db '[si+1]','$'
+SIRelTwo                db '[si+2]','$'
+SIRelThr                db '[si+3]','$'
+SIRelFour               db '[si+4]','$'
+DIRelOne                db '[di+1]','$'
+DIRelTwo                db '[di+2]','$'
+DIRelThr                db '[di+3]','$'
+DIRelFour               db '[di+4]','$'
 StringSize              dw ?
 
 UserCommandEmpty        db 14,?,14 dup('$') 
 
 
 UserCommand1 LABEL byte
-UserCommand1Size        db 14
+UserCommand1Size        db 19
 UserCommand1ActualSize  db ?
-UserCommand1Data        db 14 dup('$') 
+UserCommand1Data        db 19 dup('$') 
 
 UserCommand2 LABEL byte
-UserCommand2Size        db 14
+UserCommand2Size        db 19
 UserCommand2ActualSize  db ?
-UserCommand2Data        db 14 dup('$') 
+UserCommand2Data        db 19 dup('$') 
 
 UserComTemp LABEL byte
-UserComTempSize         db 14
+UserComTempSize         db 19
 UserComTempActualSize   db ?
-UserComTempData         db 14 dup('$') 
+UserComTempData         db 19 dup('$') 
 
 ;UserCommand2            db 14,?,14 dup('$')
 
@@ -1735,7 +1747,7 @@ UserCommand1row         db 10
 UserCommand2Col         db 21
 UserCommand2row         db 10
 
-CurCommand              db 14 dup('$')
+CurCommand              db 19 dup('$')
 actualSizeCommand       dw ? , '$'
 CurrUser                db ? , '$'
 ; ax = 0
@@ -2254,7 +2266,7 @@ MainScreen proc near
         call LevelScreen
         cmp LevelVariable+2,'1'
         je GoGame
-        ;call InputRegistersScreen
+        call InputRegistersScreen
 GoGame:
         changeGraphicsmode
         call GameScreen
@@ -2601,12 +2613,15 @@ start1:
 
 ;Command on your own processor
 FirstPowerUp:
+
     cmp LevelVariable+2,'1'
     je FirstPowerUpLevel1
     cmp Power1User1LV2,1
     jne FirstPowerUpLevel2
+
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage PowerUsedMSG
+
     GetKeyWait ScanCode,ScanCode
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
@@ -2617,6 +2632,7 @@ FirstPowerUpLevel2:
     jbe WrongPowerUp
     mov Power1User1LV2,1
     Set4Dig IntialPoints1,IP1
+
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage EnterTarget
     ReadMessage NewTargetValue
@@ -2772,15 +2788,21 @@ WrongPowerUp:
     PrintMessage UserCommandSpaces
 
 CallExecute:
+    call Refresh
     cmp LevelVariable+2,'2'
     jne start_execute
+
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage ChooseProc
+
     ReadMessage ProcessorChosen
+
     SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage UserCommandSpaces
+
     cmp ProcessorChosen+2,'1'
     je ChooseProcessorLevel2User1
+
 start_execute:   
     ReadCommand UserCommand1,UserCommand1Col,UserCommand1row,Forbidden1Data
     call excCommand
@@ -2840,6 +2862,7 @@ start2:
     je FourthPowerUp2
     cmp PowerUpChosen,6
     je FifthPowerUp2
+    SetCursor UserCommand1Col,UserCommand1row,0
     PrintMessage WrongPowerUpMSG
     push ax
     mov ah,0
@@ -2855,23 +2878,28 @@ FirstPowerUp2:
     je FirstPowerUpLevel1_2
     cmp Power1User2LV2,1
     jne FirstPowerUpLevel2_2
+
     SetCursor UserCommand2Col,UserCommand2row,0
     PrintMessage PowerUsedMSG
+
     GetKeyWait ScanCode,ScanCode
     SetCursor UserCommand2Col,UserCommand2row,0
     PrintMessage UserCommandSpaces
-    jmp CallExecute
+    jmp CallExecute2
 
 FirstPowerUpLevel2_2:
     cmp IntialPoints2,30
     jbe WrongPowerUp2
     mov Power1User2LV2,1
     Set4Dig IntialPoints2,IP2
+
     SetCursor UserCommand2Col,UserCommand2row,0
     PrintMessage EnterTarget
     ReadMessage NewTargetValue
+
     SetCursor UserCommand2Col,UserCommand2row,0
     PrintMessage UserCommandSpaces
+
     call ValidateTarget
     cmp TargetValid,1
     je change_target2
@@ -3019,6 +3047,7 @@ WrongPowerUp2:
     PrintMessage UserCommandSpaces
 
 CallExecute2:
+    call Refresh
     cmp LevelVariable+2,'2'
     jne start_execute2
     SetCursor UserCommand2Col,UserCommand2row,0
@@ -3136,7 +3165,8 @@ pusha
     cmp OK,0
     je bayz
     call TypeOp
-
+    setCursor 27,19,0
+    PrintMessage Operand2
     ;SetCursor 26,17,0
     ;PrintMessage Operand2
     ;SetCursor 26,19,0
@@ -3913,8 +3943,20 @@ compare_memory:
       je found_op1
       add bx,4
       cmp bx,83
-      je not_found_op1
+      je compare_relative
       jmp compare_memory
+
+compare_relative:
+      lea si,AX_op[bx]
+      lea di,Operand1
+      mov cx,6
+      REPE CMPSB
+      cmp cx,0
+      je found_op1
+      add bx,7
+      cmp bx,167
+      je not_found_op1
+      jmp compare_relative
 
  found_op1:    
       mov OK,1
@@ -3971,9 +4013,20 @@ compare_memory2:
       je found_op2
       add bx,4
       cmp bx,83
-      je compare_immediateNumber2
+      je compare_relative2
       jmp compare_memory2
 
+compare_relative2:
+      lea si,AX_op[bx]
+      lea di,Operand2
+      mov cx,6
+      REPE CMPSB
+      cmp cx,0
+      je found_op2
+      add bx,7
+      cmp bx,167
+      je compare_immediateNumber2
+      jmp compare_relative2
 
 compare_immediateNumber2:
     CheckImmediate Operand2, ok
@@ -4124,7 +4177,42 @@ TypeOp proc
     CompareStrings Operand1,DI_op_idx,5,OK
     cmp OK,1
     je mem_op1
-
+    CompareStrings Operand1,BXRelOne,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,BXRelTwo,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,BXRelThr,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,BXRelFour,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,SIRelOne,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,SIRelTwo,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,SIRelThr,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,SIRelFour,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,DIRelOne,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,DIRelTwo,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,DIRelThr,7,OK
+    cmp OK,1
+    je mem_op1
+    CompareStrings Operand1,DIRelFour,7,OK
+    cmp OK,1
+    je mem_op1
     CompareStrings Operand1,MEM0,4,OK
     cmp OK,1
     jne CompareMem1Op1
@@ -4256,7 +4344,42 @@ finished_typeOP:
     CompareStrings Operand2,DI_op_idx,5,OK
     cmp OK,1
     je mem_op2
-    
+    CompareStrings Operand2,BXRelOne,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,BXRelTwo,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,BXRelThr,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,BXRelFour,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,SIRelOne,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,SIRelTwo,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,SIRelThr,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,SIRelFour,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,DIRelOne,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,DIRelTwo,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,DIRelThr,7,OK
+    cmp OK,1
+    je mem_op2
+    CompareStrings Operand2,DIRelFour,7,OK
+    cmp OK,1
+    je mem_op2
     CompareStrings Operand2,MEM0,4,OK
     cmp OK,1
     jne CompareMem1Op2
@@ -4336,11 +4459,51 @@ finished_typeOP_2:
 endp TypeOp
 
 
-;-------Get Value from Operand1 for User1 Registers-------
+;-------Get Value from Operand2--------
 GetOperandValueUser1 proc
 
 pusha
-        CompareStrings Operand2,BX_op_idx,5,OK
+    ;checking on based relative
+    CompareStrings Operand2,BXRelOne,6,OK
+    cmp OK,1
+    je BXRelOneisOP1
+    CompareStrings Operand2,BXRelTwo,6,OK
+    cmp OK,1
+    je BXRelTwoisOP1
+    CompareStrings Operand2,BXRelThr,6,OK
+    cmp OK,1
+    je BXRelThrisOP1
+    CompareStrings Operand2,BXRelFour,6,OK
+    cmp OK,1
+    je BXRelFourisOP1
+
+    CompareStrings Operand2,SIRelOne,6,OK
+    cmp OK,1
+    je SIRelOneisOP1
+    CompareStrings Operand2,SIRelTwo,6,OK
+    cmp OK,1
+    je SIRelTwoisOP1
+    CompareStrings Operand2,SIRelThr,6,OK
+    cmp OK,1
+    je SIRelThrisOP1
+    CompareStrings Operand2,SIRelFour,6,OK
+    cmp OK,1
+    je SIRelFourisOP1
+
+    CompareStrings Operand2,DIRelOne,6,OK
+    cmp OK,1
+    je DIRelOneisOP1
+    CompareStrings Operand2,DIRelTwo,6,OK
+    cmp OK,1
+    je DIRelTwoisOP1
+    CompareStrings Operand2,DIRelThr,6,OK
+    cmp OK,1
+    je DIRelThrisOP1
+    CompareStrings Operand2,DIRelFour,6,OK
+    cmp OK,1
+    je DIRelFourisOP1
+    
+    CompareStrings Operand2,BX_op_idx,5,OK
     cmp OK,1
     je BXidxisOP1
     CompareStrings Operand2,SI_op_idx,5,OK
@@ -4350,6 +4513,7 @@ pusha
     cmp OK,1
     je DIidxisOP1
     
+
     cmp Operand2Type,4
     je OP2IMM
     cmp Operand2Type,5
@@ -4552,7 +4716,7 @@ user2_bxidx2:
        je Set_Mem_Type2
        cmp TemporaryCheckMem,4
        je Set_Mem_Type2
-        ;mov TemporaryCheckMem,7
+        mov TemporaryCheckMem,7
        jmp finished_GetOperandValueUser1
 
 SIidxisOP1:
@@ -4583,7 +4747,7 @@ user2_siidx2:
        je Set_Mem_Type2
        cmp TemporaryCheckMem,4
        je Set_Mem_Type2
-        ;mov TemporaryCheckMem,7
+        mov TemporaryCheckMem,7
        jmp finished_GetOperandValueUser1
 
 DIidxisOP1:
@@ -4614,8 +4778,406 @@ user2_diidx2:
        je Set_Mem_Type2
        cmp TemporaryCheckMem,4
        je Set_Mem_Type2
-        ;mov TemporaryCheckMem,7
+       mov TemporaryCheckMem,7
        jmp finished_GetOperandValueUser1
+
+BXRelOneisOP1:
+       cmp CurrUser,2
+       je user2_bxrelone2
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxrelone2:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+BXRelTwoisOP1:
+       cmp CurrUser,2
+       je user2_bxreltwo2
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxreltwo2:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+BXRelThrisOP1:
+       cmp CurrUser,2
+       je user2_bxrelthr2
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxrelthr2:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+BXRelFourisOP1:
+       cmp CurrUser,2
+       je user2_bxrelfour2
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxrelfour2:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+SIRelOneisOP1:
+       cmp CurrUser,2
+       je user2_sirelone2
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_sirelone2:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+SIRelTwoisOP1:
+       cmp CurrUser,2
+       je user2_sireltwo2
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_sireltwo2:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+SIRelThrisOP1:
+       cmp CurrUser,2
+       je user2_sirelthr2
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_sirelthr2:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+SIRelFourisOP1:
+       cmp CurrUser,2
+       je user2_sirelfour2
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_sirelfour2:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIRelOneisOP1:
+       cmp CurrUser,2
+       je user2_direlone2
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_direlone2:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIRelTwoisOP1:
+       cmp CurrUser,2
+       je user2_direltwo2
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_direltwo2:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIRelThrisOP1:
+       cmp CurrUser,2
+       je user2_direlthr2
+       SetCursor 22,14,0
+       PrintMessage pushCommand
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_direlthr2:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIRelFourisOP1:
+       cmp CurrUser,2
+       je user2_direlfour2
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_direlfour2:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type2
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type2
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
 
 
 OP2Imm:
@@ -4625,7 +5187,7 @@ OP2Imm:
 Set_Mem_Type2:
     pusha
     mov ax,TemporaryCheckMem
-    mov Operand1TypeInMemory,al
+    mov Operand2TypeInMemory,al
     popa
 
 OP2MEM:
@@ -4706,6 +5268,47 @@ endp GetOperandValueUser1
 GetOperandValueUser2 proc
 
     pusha
+    ;checking on indirect
+        ;checking on based relative
+    CompareStrings Operand1,BXRelOne,6,OK
+    cmp OK,1
+    je BXRelOneisOP2
+    CompareStrings Operand1,BXRelTwo,6,OK
+    cmp OK,1
+    je BXRelTwoisOP2
+    CompareStrings Operand1,BXRelThr,6,OK
+    cmp OK,1
+    je BXRelThrisOP2
+    CompareStrings Operand1,BXRelFour,6,OK
+    cmp OK,1
+    je BXRelFourisOP2
+
+    CompareStrings Operand1,SIRelOne,6,OK
+    cmp OK,1
+    je SIRelOneisOP2
+    CompareStrings Operand1,SIRelTwo,6,OK
+    cmp OK,1
+    je SIRelTwoisOP2
+    CompareStrings Operand1,SIRelThr,6,OK
+    cmp OK,1
+    je SIRelThrisOP2
+    CompareStrings Operand1,SIRelFour,6,OK
+    cmp OK,1
+    je SIRelFourisOP2
+
+    CompareStrings Operand1,DIRelOne,6,OK
+    cmp OK,1
+    je DIRelOneisOP2
+    CompareStrings Operand1,DIRelTwo,6,OK
+    cmp OK,1
+    je DIRelTwoisOP2
+    CompareStrings Operand1,DIRelThr,6,OK
+    cmp OK,1
+    je DIRelThrisOP2
+    CompareStrings Operand1,DIRelFour,6,OK
+    cmp OK,1
+    je DIRelFourisOP2
+
     CompareStrings Operand1,BX_op_idx,4,OK
     cmp OK,1
     je BXidxisOP2
@@ -4715,6 +5318,7 @@ GetOperandValueUser2 proc
     CompareStrings Operand1,DI_op_idx,4,OK
     cmp OK,1
     je DIidxisOP2
+
 
     cmp Operand1Type,3
     je OP1MEM
@@ -4942,7 +5546,7 @@ user2_bxidx:
        je Set_Mem_Type
        cmp TemporaryCheckMem,4
        je Set_Mem_Type
-        ;mov TemporaryCheckMem,7
+        mov TemporaryCheckMem,7
        jmp finished_GetOperandValueUser2
 
 SIidxisOP2:
@@ -4973,7 +5577,7 @@ user2_siidx:
        je Set_Mem_Type
        cmp TemporaryCheckMem,4
        je Set_Mem_Type
-        ;mov TemporaryCheckMem,7
+        mov TemporaryCheckMem,7
        jmp finished_GetOperandValueUser2
 
 DIidxisOP2:
@@ -5004,12 +5608,411 @@ user2_diidx:
        je Set_Mem_Type
        cmp TemporaryCheckMem,4
        je Set_Mem_Type
-        ;mov TemporaryCheckMem,7
+        mov TemporaryCheckMem,7
        jmp finished_GetOperandValueUser2
 
+BXRelOneisOP2:
+       cmp CurrUser,2
+       je user2_bxrelone
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxrelone:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+BXRelTwoisOP2:
+       cmp CurrUser,2
+       je user2_bxreltwo
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxreltwo:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+BXRelThrisOP2:
+       cmp CurrUser,2
+       je user2_bxrelthr
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxrelthr:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+BXRelFourisOP2:
+       cmp CurrUser,2
+       je user2_bxrelfour
+       AsciiToNumber BX_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_bxrelfour:
+       AsciiToNumber BX_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+SIRelOneisOP2:
+       cmp CurrUser,2
+       je user2_sirelone
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_sirelone:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+SIRelTwoisOP2:
+       cmp CurrUser,2
+       je user2_sireltwo
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_sireltwo:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+SIRelThrisOP2:
+       cmp CurrUser,2
+       je user2_sirelthr
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_sirelthr:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+SIRelFourisOP2:
+       cmp CurrUser,2
+       je user2_sirelfour
+       AsciiToNumber SI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_sirelfour:
+       AsciiToNumber SI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIRelOneisOP2:
+       cmp CurrUser,2
+       je user2_direlone
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_direlone:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,1
+       PrintMessage TemporaryCheckMem
+       SetCursor 22,14,0
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIRelTwoisOP2:
+       cmp CurrUser,2
+       je user2_direltwo
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_direltwo:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,2
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIRelThrisOP2:
+       cmp CurrUser,2
+       je user2_direlthr
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_direlthr:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,3
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+
+DIRelFourisOP2:
+       cmp CurrUser,2
+       je user2_direlfour
+       AsciiToNumber DI_Reg_Value2,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+       mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
+user2_direlfour:
+       AsciiToNumber DI_Reg_Value1,0,TemporaryCheckMem
+       add TemporaryCheckMem,4
+       cmp TemporaryCheckMem,0
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,1
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,2
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,3
+       je Set_Mem_Type
+       cmp TemporaryCheckMem,4
+       je Set_Mem_Type
+        mov TemporaryCheckMem,7
+       jmp finished_GetOperandValueUser2
 
 Set_Mem_Type:
     pusha
+    SetCursor 22,14,0
+    PrintMessage TemporaryCheckMem
     mov ax,TemporaryCheckMem
     mov Operand1TypeInMemory,al
     popa
@@ -5087,16 +6090,56 @@ endp GetOperandValueUser2
 LoadOperandValueUser1 proc
 
     pusha
+    CompareStrings Operand1,BXRelOne,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,BXRelTwo,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,BXRelThr,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,BXRelFour,6,OK
+    cmp OK,1
+    je BXidxisLoad
+
+    CompareStrings Operand1,SIRelOne,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,SIRelTwo,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,SIRelThr,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,SIRelFour,6,OK
+    cmp OK,1
+    je BXidxisLoad
+
+    CompareStrings Operand1,DIRelOne,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,DIRelTwo,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,DIRelThr,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    CompareStrings Operand1,DIRelFour,6,OK
+    cmp OK,1
+    je BXidxisLoad
+    
     CompareStrings Operand1,BX_op_idx,4,OK
     cmp OK,1
     je BXidxisLoad
     CompareStrings Operand1,SI_op_idx,4,OK
     cmp OK,1
-    je SIidxisLoad
+    je BXidxisLoad
     CompareStrings Operand1,DI_op_idx,4,OK
     cmp OK,1
-    je DIidxisLoad
-    
+    je BXidxisLoad
+
+
     cmp Operand1Type,3
     je Load_OP1MEM
 
@@ -5322,14 +6365,16 @@ bplod_2:
     cmp TemporaryCheckMem,4
     ja finished_LoadOperandValueUser
     jmp Load_OP1MEM
- SIidxisLoad:
-    cmp TemporaryCheckMem,4
-    ja finished_LoadOperandValueUser
-    jmp Load_OP1MEM
- DIidxisLoad:
-    cmp TemporaryCheckMem,4
-    ja finished_LoadOperandValueUser
-    jmp Load_OP1MEM
+ ;SIidxisLoad:
+  ;  cmp TemporaryCheckMem,4
+   ; ja finished_LoadOperandValueUser
+   ; jmp Load_OP1MEM
+ ;DIidxisLoad:
+  ;  cmp TemporaryCheckMem,4
+  ;  ja finished_LoadOperandValueUser
+  ;  jmp Load_OP1MEM
+;BXRelOneisLoad:
+
 
  Load_OP1MEM:
     cmp Operand1TypeInMemory, 0
