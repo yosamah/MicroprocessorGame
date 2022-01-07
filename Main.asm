@@ -2,6 +2,158 @@
 
 ;-----------------MACROS-----------------
 
+
+;-------------------Serial Port Macros-------------------
+
+;----Initializes serial port with a certian configuration---
+SerialPort MACRO
+    ;Set divisor latch access bit
+    MOV DX, ADDRESS+3    ;Line control register
+    MOV AL, 10000000b
+    OUT DX, AL
+
+    ;Set the least significant byte of the Baud rate divisor latch register
+    MOV DX, ADDRESS
+    MOV AL, 0CH
+    OUT DX, AL
+
+    ;Set the most significant byte of the Baud rate divisor latch register
+    MOV DX, ADDRESS+1
+    MOV AL, 0
+    OUT DX, AL
+
+    ;Set serial port configurations
+    MOV DX, ADDRESS+3    ;Line Control Register
+    MOV AL, 00011011B
+    ;0:     Access to receiver and transmitter buffers
+    ;0:     Set break disabled
+    ;011:   Even parity
+    ;0:     One stop bit
+    ;11:    8-bit word length
+    OUT DX, AL
+ENDM SerialPort
+
+;-------Send character serial port-------
+SendCharSerial MACRO char
+LOCAL Send
+    Send:
+    MOV DX, ADDRESS+5    ;Line Status Register
+    IN AL, DX
+    AND AL, 00100000B       ;Check transmitter holding register status: 1 ready, 0 otherwise
+    JZ Send                 ;Transmitter is not ready
+    MOV DX, ADDRESS
+    MOV AL, char
+    OUT DX, AL
+ENDM SendCharSerial
+
+;------Receive a character from the serial port into AL----
+ReceiveCharSerial MACRO
+LOCAL ending
+    MOV AL, 0
+    MOV DX, ADDRESS+5    ;Line Status Register
+    IN AL, DX
+    AND AL, 00000001B       ;Check for data ready
+    JZ ending               ;No character received
+    MOV DX, ADDRESS      ;Receive data register
+    IN AL, DX
+    ending:
+ENDM ReceiveCharSerial
+
+;--------Print Character in Serial-------
+PrintCharSerial MACRO char
+    MOV AH, 02H
+    MOV DL, char
+    INT 21H
+ENDM PrintCharSerial
+
+;--------Empty buffer in Serial----------
+EmptyBuffer MACRO
+LOCAL Back, Return
+    Back:
+    GetKeyNoWaitSerial
+    JZ Return
+    GetKeyWaitSerial
+    JMP Back
+    Return:
+ENDM EmptyBuffer
+
+;--------Get key wait for serial---------
+GetKeyWaitSerial MACRO 
+    MOV AH, 00H
+    INT 16H
+endm GetKeyWaitSerial
+
+;-------Get key no wait for serial-------
+GetKeyNoWaitSerial MACRO 
+    MOV AH, 01H
+    INT 16H
+endm GetKeyNoWaitSerial
+
+;--------Flush keys pressed serial-------
+FlushPressedSerial MACRO
+LOCAL NoKeyPressed
+    GetKeyNoWaitSerial
+    jz NoKeyPressed
+    GetKeyWaitSerial
+    NoKeyPressed:
+ENDM FlushPressedSerial
+
+;--------Checking Input Character--------
+; StartY for sending is WindowStart
+; StartY for receiving is ChatHeight
+CheckInputCharSerial MACRO char, x, y, StartY 
+LOCAL Checking_Enter, Check_Scroll, Checking_BS, Checking_Printable, Modifying_Cursor, ending_check_char
+
+    CMP char, ESCAsciiCode
+    JNE Checking_Enter
+    MOV end_chat, 1
+    jmp ending_check_char
+    
+    Checking_Enter:
+    cmp char, 0DH ;enter ascii
+    jne Checking_BS
+    mov x, WindowStart+4
+    inc y 
+    jmp Check_Scroll
+
+    Checking_BS:
+    cmp char, 8  ;backspace ascii
+    jne Checking_Printable
+    cmp x, WindowStart
+    jbe Checking_Printable
+    mov char, ' '
+    dec x
+    SetCursor x,y,0
+    PrintCharSerial char
+    jmp ReceivingChat
+
+    Checking_Printable:  ;printing character if printable
+    cmp char, ' '
+    jb ReceivingChat
+    cmp char, '~'
+    ja ReceivingChat
+
+    SetCursor x,y,0
+    PrintCharSerial char  
+
+    Modifying_Cursor:
+    inc x
+    cmp x, ChatLength - 1
+    jb ending_check_char
+    mov x, WindowStart
+    inc y
+
+    Check_Scroll:
+    cmp y, ChatHeight+StartY-1
+    jbe ending_check_char
+    dec y
+    Scroll WindowStart,StartY+2,WindowEndX,y,00h,1
+
+ending_check_char:
+
+endm CheckInputCharSerial        
+
+
 ;-------Debug------
 Debug macro charDebug
     SetCursor 10,10,0
@@ -518,6 +670,35 @@ end:
 
 endm CheckImmediate
 
+;-------Convert from Ascii (decimal) to number-------
+AsciiToNumberDecimal MACRO current,answer
+LOCAL looping,rest,setSize
+    
+    pusha
+    GetStringSize current,StringSize
+    mov si,StringSize
+    mov bx,0
+    mov cx,1 
+
+looping:
+    mov ah,0
+    mov al,current[si-1]
+    sub al,30h
+rest:
+    mul cx
+    add bx,ax
+    mov dx,10
+    mov ax,cx
+    mul dx
+    mov cx,ax
+    dec si
+    cmp si,0
+    ja looping
+    mov answer,bx
+
+popa
+endm AsciiToNumberDecimal
+
 ;-------Convert from Ascii (hexa) to number-------
 ; If u know the size send it in "val" 
 ; if not send 0 in val & it automatically calculates size 
@@ -670,7 +851,7 @@ ScrollScreenUp MACRO x1,y1,x2,y2,Color,line
 endm ScrollScreenUp
 
 ;--------Getting the username from the user----------
-GetUserName MACRO UserName
+GetUser1Name MACRO UserName
     LOCAL loop_Name_main
     LOCAL invalidName
     LOCAL NameComplete 
@@ -711,7 +892,37 @@ GetUserName MACRO UserName
     jmp loop_Name_main
          
     NameComplete: 
-ENDM GetUserName
+ENDM GetUser1Name
+
+;--------Getting the username from the user----------
+ReceiveUser2Var MACRO User1,User2,Size
+    LOCAL Sending_My_Var,Still_Waiting,Still_Receiving
+
+    mov BX, 2
+    Sending_My_Var:
+    mov cl, User1[bx]
+    SendCharSerial cl
+
+    Still_Waiting:
+    FlushPressedSerial
+    cmp al, ESCAsciiCode
+    jne Still_Receiving
+    mov ax,4c00h ;hlt
+    int 21h
+    
+    Still_Receiving:
+    ReceiveCharSerial
+    JZ Still_Waiting
+
+    mov User2[bx],al
+    inc bx 
+    cmp bx, Size
+    jbe Sending_My_Var
+
+    EmptyBuffer
+ENDM ReceiveUser2Name
+
+
 
 ;--------Reading initial points from the user----------
 ;--------Initial points are a 1 or 2 digit number------
@@ -761,6 +972,7 @@ invalidcharacter:
     jmp loop_number_main           
         
 numbercomplete: 
+
 ENDM ReadNumber
 
 
@@ -1336,20 +1548,30 @@ ENDM ShipAction
 ;--------Main menu----------
 MainMenu  MACRO 
     
+    SerialPort
+    
     changeTextmode  
     WelcomeText
 
     ;Getting Info  of user1 
-    GetUserName User1Name
+    GetUser1Name User1Name
+    ReceiveUser2Var User1Name,User2Name,UserNameSize
+    
     ReadNumber IntialPoints1
+    Set4Dig IntialPoints1,IP1
+    ReceiveUser2Var IP1,IP2,InitialPointsSize 
+    AsciiToNumberDecimal IP2,IntialPoints2
+
     ReadForbidden Forbidden2
+    ReceiveUser2Var Forbidden2,Forbidden1,ForbiddenSizeSerial
+
     call GetEnter
 
     ;Getting Info  of user2 
-    GetUserName User2Name
-    ReadNumber IntialPoints2
-    ReadForbidden Forbidden1
-    call GetEnter
+    ;GetUserName User2Name
+    ;ReadNumber IntialPoints2
+    ;ReadForbidden Forbidden1
+    ;call GetEnter
 
     ;Setting minimum initial points
     GetMin IntialPoints1,IntialPoints2,MinIP
@@ -1357,6 +1579,8 @@ MainMenu  MACRO
     mov ax, MinIP
     mov IntialPoints1,ax
     mov IntialPoints2,ax
+    Set4Dig IntialPoints1,IP1
+    Set4Dig IntialPoints2,IP2
     popa
     
     Call MainScreen
@@ -1369,7 +1593,11 @@ ENDM MainMenu
 .386
 .data 
 
+ADDRESS EQU 3F8H
 Winner                  db 0
+UserNameSize            dw 12,'$'
+InitialPointsSize       dw 4,'$'
+ForbiddenSizeSerial     dw 4,'$'
 
 User1                   db 'USER1$'
 User1Name               DB 12,?,12 DUP('$') , '$'
@@ -1581,6 +1809,8 @@ messageinvalidcharacter DB 'Invalid Input',10,13, '$'
 
 
 ;Chat Variables
+end_chat                db 0
+ChatStart               equ 1
 ChatHeight              equ 11
 ChatLength              equ 80
 ChatStatusMSG1          db 'To end chat press F3 $'
@@ -1592,7 +1822,8 @@ User2CursorY            db ?
 ChatMessage             db 70,?,70 dup('$')
 ChatMessage2            db ?,'$'
 test2                   db 25,?,25 dup('$')
-
+SentCharChat            db ?
+ReceivedCharChat        db ?
 
 ;Global window variables
 WindowStart             equ 0
@@ -1612,6 +1843,8 @@ F3Scancode              equ 61d
 F2Scancode              equ 60d
 F1Scancode              equ 59d
 ESCScancode             equ 1d
+F3AsciiCode             equ 3DH
+ESCAsciiCode            equ 1BH
 
 Semicolon               db ':$'
 
@@ -1874,6 +2107,7 @@ main proc far
 
     MainMenu
 
+    
     mov ah,0
     int 16h  
     GoodByeText
@@ -2488,6 +2722,9 @@ endp WinnerScreen
 ;-------Chat Proc-------
 ChatWindow proc near
 
+    ;Drawing Chat Screen
+   
+    mov end_chat, 0
     ClearScreen WindowStart,WindowStart,WindowEndX,WindowEndY,0
     
     DrawLine WindowStart,WindowStart,WindowEndX,0,03h,0,'-'
@@ -2511,28 +2748,26 @@ ChatWindow proc near
 CursorLoop:
 
     SetCursor User1CursorX,User1CursorY,0
-    GetKeyWait ScanCode,ChatMessage2
     
-    cmp ScanCode,F3Scancode
-    jz Khalas
+    SendingChat:
+    FlushPressedSerial
+    JZ ReceivingChat
+    mov SentCharChat, AL
+    SendCharSerial SentCharChat
+    CheckInputCharSerial SentCharChat, User1CursorX, User1CursorY, WindowStart
 
-    PrintMessage ChatMessage2
-    ReadMessage ChatMessage
-    inc User1CursorY
+    cmp end_chat, 1
+    je Khalas
 
-    SetCursor User2CursorX,User2CursorY,0
-    GetKeyWait ScanCode,ChatMessage2
-    cmp ScanCode,F3Scancode
-    
-    jz Khalas
-    PrintMessage ChatMessage2
+    ReceivingChat:
+    ReceiveCharSerial
+    jz CursorLoop
+    mov ReceivedCharChat, AL
+    CheckInputCharSerial ReceivedCharChat, User2CursorX, User2CursorY, ChatHeight
 
-    ReadMessage ChatMessage
-    inc User2CursorY
+    cmp end_chat, 1
+    jne CursorLoop
 
-    call CheckCursor 
-        
-    jmp CursorLoop
 Khalas:
     call MainScreen
     ret
